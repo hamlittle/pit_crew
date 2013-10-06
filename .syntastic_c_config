@@ -1,0 +1,2 @@
+-mmcu=atxmega128a1
+-Os
