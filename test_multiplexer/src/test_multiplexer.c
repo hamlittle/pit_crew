@@ -58,7 +58,7 @@ void setup_leds(void) {
    LEDPORT.DIR = 0xff;                 // set all pins of port E to output
    PORTCFG.MPCMASK = 0xff;             // set for all pins on port E...
    LEDPORT.PIN0CTRL |= PORT_INVEN_bm;  // inverted output (set hi turns on led)
-   LEDPORT.OUTCLR = 0x00;              // turn all leds off
+   LEDPORT.OUTCLR = 0xff;              // turn all leds off
 }
 
 /** \brief Sets up the switches.
@@ -127,7 +127,7 @@ int main(void) {
 
    while (1)
    {
-      if (!pushed && (SWITCHPORTH.IN & CYCLE_SWITCH_bm)) {
+      if (!pushed && (SWITCHPORTH.IN & CYCLE_SWITCH_bm) == 0) {
          if (channel == 15) {
             channel = -1;
          }
@@ -135,7 +135,7 @@ int main(void) {
          show_channel(channel);
          pushed = 1;
       }
-      else if (pushed && (SWITCHPORTH.IN & CYCLE_SWITCH_bm) == 0) {
+      else if (pushed && (SWITCHPORTH.IN & CYCLE_SWITCH_bm)) {
          pushed = 0;
       }
       show_signal(SIGNAL_PORT.IN & SIGNAL_PIN_bm);

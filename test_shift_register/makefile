@@ -26,19 +26,23 @@
 
 # The name of the program you're building, usually the file which contains main().
 # The name without its extension (.c or .cpp or whatever) must be given here.
-TARGET = test_multiplexer
+TARGET = test_shift_register
+
+# The name of the folder holding the source files
+SRC_DIR = src
 
 # A list of the source (.c, .cc, .cpp) files in the project, including $(TARGET). Files
 # in library subdirectories do not go in this list; they're automatically in LIB_OBJS
-SRC = src/$(TARGET).c
+SRC = $(TARGET).c
 
 # A list of the header file directories this project depends on. This is only necessary
 # if the project has separate directories for .h and .c files (such as src/ and inc/)
-H_DIRS = inc
+INC_DIR = inc
 
 # Clock frequency of the CPU, in Hz. This number should be an unsigned long integer.
 # For example, 16 MHz would be represented as 16000000UL.
-F_CPU = 32000000UL # 32MHz
+# F_CPU = 32000000UL # 32MHz
+F_CPU = 2000000UL # 2MHz
 
 # These codes are used to switch on debugging modes if they're being used. Several can
 # be placed on the same line together to activate multiple debugging tricks at once.
@@ -173,11 +177,12 @@ C_WARNINGS = -Wall -Wextra -Wshadow -Wpointer-arith -Wbad-function-cast -Wcast-a
 CPP_WARNINGS = -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align -Wsign-compare \
 	       -Wmissing-declarations -Wunused
 
-C_FLAGS = -D GCC_MEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
+C_FLAGS = -D GCC_XMEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
 	  -fsigned-char -funsigned-bitfields -fpack-struct -fshort-enums \
 	  -std=gnu99 -g $(OPTIM) -mmcu=$(MCU) $(OTHERS) $(C_WARNINGS) \
 	  $(patsubst %,-I%,$(LIB_DIRS)) \
-	  $(patsubst %,-I%,$(H_DIRS))
+	  $(patsubst %,-I%,$(INC_DIR))
+$(patsubst %,-I%,$(SRC_DIRS))
 
 CPP_FLAGS = -D GCC_MEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
 	    -fsigned-char -funsigned-bitfields -fshort-enums \
@@ -186,8 +191,8 @@ CPP_FLAGS = -D GCC_MEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
 
 # This section makes a list of object files from the source files in the SRC list,
 # separating the C++ source files, the C source files, and assembly source files
-OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRC))) \
-       $(patsubst %.c, %.o, $(filter %.c, $(SRC))) \
+OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRC_DIR)/$(SRC))) \
+       $(patsubst %.c, %.o, $(filter %.c, $(SRC_DIR)/$(SRC))) \
        $(ASRC:.S=.o)
 
 # This section makes a list of object files from the source files in subdirectories
@@ -335,6 +340,16 @@ clean:
 	@echo -n Cleaning compiled files and documentation...
 	@rm -f $(LIB_NAME) *.o *.hex *.lst *.elf *~
 	@for subdir in $(LIB_DIRS); do \
+		rm -f $$subdir/*.o; \
+		rm -f $$subdir/*.lst; \
+		rm -f $$subdir/*~; \
+		done
+	@for subdir in $(INC_DIR); do \
+		rm -f $$subdir/*.o; \
+		rm -f $$subdir/*.lst; \
+		rm -f $$subdir/*~; \
+		done
+	@for subdir in $(SRC_DIR); do \
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \
 		rm -f $$subdir/*~; \
