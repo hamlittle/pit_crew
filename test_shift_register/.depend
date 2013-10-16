@@ -1,0 +1,2 @@
+ src/ex.o: src/test_shift_register.c inc/test_shift_register.h \
+ inc/board.h inc/avr_compiler.h

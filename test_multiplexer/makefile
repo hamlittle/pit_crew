@@ -26,19 +26,23 @@
 
 # The name of the program you're building, usually the file which contains main().
 # The name without its extension (.c or .cpp or whatever) must be given here.
-TARGET = test_multiplexer
+TARGET = test_shift_register
+
+# The name of the folder holding the source files
+SRC_DIR = src
 
 # A list of the source (.c, .cc, .cpp) files in the project, including $(TARGET). Files
 # in library subdirectories do not go in this list; they're automatically in LIB_OBJS
-SRC = src/$(TARGET).c
+SRC = $(wildcard $(SRC_DIR)/*.c)
 
 # A list of the header file directories this project depends on. This is only necessary
 # if the project has separate directories for .h and .c files (such as src/ and inc/)
-H_DIRS = inc
+INC_DIR = inc
 
 # Clock frequency of the CPU, in Hz. This number should be an unsigned long integer.
 # For example, 16 MHz would be represented as 16000000UL.
-F_CPU = 32000000UL # 32MHz
+# F_CPU = 32000000UL # 32MHz
+F_CPU = 2000000UL # 2MHz
 
 # These codes are used to switch on debugging modes if they're being used. Several can
 # be placed on the same line together to activate multiple debugging tricks at once.
@@ -173,11 +177,11 @@ C_WARNINGS = -Wall -Wextra -Wshadow -Wpointer-arith -Wbad-function-cast -Wcast-a
 CPP_WARNINGS = -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align -Wsign-compare \
 	       -Wmissing-declarations -Wunused
 
-C_FLAGS = -D GCC_MEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
+C_FLAGS = -D GCC_XMEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
 	  -fsigned-char -funsigned-bitfields -fpack-struct -fshort-enums \
 	  -std=gnu99 -g $(OPTIM) -mmcu=$(MCU) $(OTHERS) $(C_WARNINGS) \
 	  $(patsubst %,-I%,$(LIB_DIRS)) \
-	  $(patsubst %,-I%,$(H_DIRS))
+	  $(patsubst %,-I%,$(INC_DIR)) \
 
 CPP_FLAGS = -D GCC_MEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
 	    -fsigned-char -funsigned-bitfields -fshort-enums \
@@ -206,9 +210,9 @@ LIB_OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(LIB_SRC))) \
 # Inference rules show how to process each kind of file.
 
 # How to compile a .c file into a .o file
-.c.o:
-	@echo $<
-	@avr-gcc -c $(C_FLAGS) $< -o $@
+# %.o: %.c
+# 	@echo $<
+# 	@avr-gcc -c $(C_FLAGS) $< -o $@
 
 # How to compile a .cc file into a .o file
 .cc.o:
@@ -219,6 +223,15 @@ LIB_OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(LIB_SRC))) \
 .cpp.o:
 	@echo $<
 	@avr-gcc -c $(CPP_FLAGS) $< -o $@
+
+DEPS :=$(OBJS:.o=.d)
+
+-include $(DEPS)
+
+%.o: %.c
+	@echo $<
+	@avr-gcc $(C_FLAGS) -MM -MT '$@' -MF $(patsubst %.o,%.d,$@) $< #build .d
+	@avr-gcc $(C_FLAGS) -c $< -o $@
 
 #--------------------------------------------------------------------------------------
 # Make the main target of this project.  This target is invoked when the user types
@@ -338,6 +351,17 @@ clean:
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \
 		rm -f $$subdir/*~; \
+		done
+	@for subdir in $(INC_DIR); do \
+		rm -f $$subdir/*.o; \
+		rm -f $$subdir/*.lst; \
+		rm -f $$subdir/*~; \
+		done
+	@for subdir in $(SRC_DIR); do \
+		rm -f $$subdir/*.o; \
+		rm -f $$subdir/*.lst; \
+		rm -f $$subdir/*~; \
+		rm -f $$subdir/*.d; \
 		done
 	@echo done.
 

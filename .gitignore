@@ -1,2 +1,7 @@
+# syntastic c config file
 .syntastic*
-.gitignore
+
+# compiled files
+*.elf
+*.hex
+*.est
