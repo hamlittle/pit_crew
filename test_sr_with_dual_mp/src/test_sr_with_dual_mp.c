@@ -34,13 +34,19 @@ void setup(void) {
 }
 
 void setup_clocks(void) {
-   // set 32MHZ oscillator as CPU clock source
-   CLKSYS_Enable( OSC_RC32MEN_bm );
-   do { nop(); } while ( CLKSYS_IsReady( OSC_RC32MRDY_bm ) == 0 );
-   CLKSYS_Main_ClockSource_Select( CLK_SCLKSEL_RC32M_gc );
 
-   // disable 2MHz and 32KHz oscillators
-   CLKSYS_Disable( OSC_RC2MEN_bm | OSC_RC32KEN_bm);
+   // set 32MHZ oscillator as CPU clock source
+   CLKSYS_Enable(OSC_RC32MEN_bm);                          // enable
+   do { nop(); } while (!CLKSYS_IsReady(OSC_RC32MRDY_bm)); // wait til stable
+   CLKSYS_Main_ClockSource_Select(CLK_SCLKSEL_RC32M_gc);   // select for CPU
+
+   // set internal 32KHz oscillator as source for DFLL and autocalibrate 32MHz
+   CLKSYS_Enable(OSC_RC32KEN_bm);                          //enable
+   do { nop(); } while (!CLKSYS_IsReady(OSC_RC32KRDY_bm)); // wait til stable
+   CLKSYS_AutoCalibration_Enable(OSC_RC32MCREF_bm, false); // false == int 32KHz
+
+   // disable unused oscillators
+   CLKSYS_Disable(OSC_RC2MEN_bm);
 }
 
 void setup_leds(void) {
