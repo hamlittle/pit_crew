@@ -10,13 +10,23 @@
  * into the file for more details. Includes <avr/io.h>, which will pull correct
  * atmel header so long as -mmcu is defined on the compile line. */
 #include "avr_compiler.h"
+#include "clksys_driver.h"
 
 /**** function prototypes *****************************************************/
+
+typedef enum multiplexer_select { mp0, mp1 } mp_select_t;
 
 /** \brief Calls all the setup_* functions.
  *
  * should be called from main to set up the board. */
 void setup(void);
+
+/** \brief Initialize and set cpu and periheral clocks.
+ *
+ * -CPU: 32HMZ
+ * -Peripherals
+ *    -none */
+void setup_clocks(void);
 
 /** \brief Sets up the LEDS.
  *
@@ -33,22 +43,22 @@ void setup_leds(void);
  *    - GPIO_3 (PD2) = L_Clock  */
 void setup_SR_pins(void);
 
-/** \brief Sets up the signal reading pin.
+/** \brief Sets up the signal reading pins.
  *
- * GPIO_4 (PD3) is used to read the value on the signal pin of
- * the multiplexer.   */
-void setup_signal_pin(void);
+ * GPIO_4 (PD3) is used to read the value on the signal pin of the first
+ * multiplexer (multiplexer0).  GPIO_4 (PD3) is used to read the value on the
+ * signal pin of the second multiplexer (multiplexer1).  */
+void setup_signal_pins(void);
 
 /** \brief Sets up the switches.
  *
  * Switch 7 cycles through multiplexer chanels 0..15 */
 void setup_switches(void);
 
-
 /** \brief Sets LEDS[0..3] to the binary value of the selected channel.
  *
  * \param channel which channel is currently selected */
-void show_channel(int8_t channel);
+void show_channel(mp_select_t mp_select, uint8_t channel);
 
 /** \brief Selects the multiplexer channel.
  *
@@ -59,12 +69,12 @@ void show_channel(int8_t channel);
  *    - GPIO_3 (PD2) = L_Clock
  *
  * \param channel which channel to select   */
-void set_channel(int8_t channel);
+void set_channel(mp_select_t mp_select, uint8_t channel);
 
 /** \brief LEDS[4..7] will be lit if signal evaluates to true.
  *
  * \param signal_present whether a signal is present.  */
-void show_signal(uint8_t signal_present);
+void show_signal(mp_select_t, uint8_t signal_present);
 
 #endif /* end of include guard: _TEST_SHIFT_REGISTER_H_ */
 
