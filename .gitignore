@@ -3,5 +3,6 @@
 
 # compiled files
 *.elf
+*.lst
 *.hex
 *.est
