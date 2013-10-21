@@ -42,7 +42,6 @@ void setup_leds(void) {
 void setup_SR_pins(void) {
    SR_PORT.DIR |= SR_PINS_gm; // set SR pins as outputs
    SR_PORT.OUTCLR = 0xff;     // set to 0 initially
-   return;
 }
 
 void setup_signal_pins(void) {
@@ -77,11 +76,13 @@ void show_channel(mp_select_t mp_select, uint8_t channel) {
 }
 
 void set_channel(mp_select_t mp_select, uint8_t channel) {
-   static int8_t channel0 = 0;
-   static int8_t channel1 = 0;
+   static int8_t chan_pins = 4;
    int8_t chan_counter;
-   int8_t chan_pin_mask = 0x80;
-   uint8_t cur_channels;
+   int8_t chan_pin_mask = 0x08;
+   static uint8_t channel0 = 0;
+   static uint8_t channel1 = 0;
+
+   SR_PORT.OUTCLR = SR_PINS_gm;
 
    if (mp_select == mp0) {
       channel0 = channel;
@@ -90,15 +91,20 @@ void set_channel(mp_select_t mp_select, uint8_t channel) {
       channel1 = channel;
    }
 
-   // channel 0 on high 4 lines: SR[e..h]
-   cur_channels = channel1 | channel0 << LINES_PER_MP;
-
-   SR_PORT.OUTCLR = SR_PINS_gm;
-
-   for (chan_counter = 0; chan_counter < LINES_PER_MP * 2; ++chan_counter) {
-
+   for (chan_counter = 0; chan_counter < chan_pins; ++chan_counter) {
       // set order: msb->lsb
-      if (cur_channels & (chan_pin_mask >> chan_counter)) {
+      if (channel0 & (chan_pin_mask >> chan_counter)) {
+         SR_PORT.OUTSET = SR_SER_IN_PIN_bm;
+      }
+      else {
+         SR_PORT.OUTCLR = SR_SER_IN_PIN_bm;
+      }
+      SR_PORT.OUTSET = SR_CLOCK_PIN_bm; // clock high to shift in value
+      SR_PORT.OUTCLR = SR_CLOCK_PIN_bm; // clock low to set next value
+   }
+   for (chan_counter = 0; chan_counter < chan_pins; ++chan_counter) {
+      // set order: msb->lsb
+      if (channel1 & (chan_pin_mask >> chan_counter)) {
          SR_PORT.OUTSET = SR_SER_IN_PIN_bm;
       }
       else {
@@ -119,15 +125,23 @@ void show_signal(mp_select_t mp_select, uint8_t signal_present) {
    // if signal high and not toggled, then toggle to show signal
    // if signal low and toggled, then revert to showing channel
    if (mp_select == mp0) {
-      if ((signal_present && !chan0_toggled) ||
-          (!signal_present && chan0_toggled)) {
+      if (signal_present && !chan0_toggled) {
          LEDPORT.OUTTGL = CHANNEL0_LEDS_gm;
+         chan0_toggled = true;
+      }
+      else if (!signal_present && chan0_toggled) {
+         LEDPORT.OUTTGL = CHANNEL0_LEDS_gm;
+         chan0_toggled = false;
       }
    }
    else {
-      if ((signal_present && !chan1_toggled) ||
-          (!signal_present && chan1_toggled)) {
-         LEDPORT.OUTTGL = CHANNEL0_LEDS_gm;
+      if (signal_present && !chan1_toggled) {
+         LEDPORT.OUTTGL = CHANNEL1_LEDS_gm;
+         chan1_toggled = true;
+      }
+      else if (!signal_present && chan1_toggled) {
+         LEDPORT.OUTTGL = CHANNEL1_LEDS_gm;
+         chan1_toggled = false;
       }
    }
 }
