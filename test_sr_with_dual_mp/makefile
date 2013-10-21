@@ -103,12 +103,11 @@ MCU = atxmega128a1
 
 # This is the name of the library file which will hold object code which has been
 # compiled from all the source files in the library subdirectories
-# LIB_NAME = me405.a
+LIB_NAME = libpitcrew.a
 
 # A list of directories in which source files (*.cpp, *.c) and headers (.h) for the
 # library are kept
-# LIB_DIRS = lib/freertos lib/frtcpp lib/misc lib/comm lib/sensors lib/sd_card \
-	# 	   lib/serial
+LIB_DIRS = lib/atmel
 
 #--------------------------------------------------------------------------------------
 # In this section, default settings for fuse bytes are given for each processor which
@@ -207,22 +206,7 @@ LIB_OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(LIB_SRC))) \
 	   $(LIB_ASRC:.S=.o)
 
 #--------------------------------------------------------------------------------------
-# Inference rules show how to process each kind of file.
-
-# How to compile a .c file into a .o file
-# %.o: %.c
-# 	@echo $<
-# 	@avr-gcc -c $(C_FLAGS) $< -o $@
-
-# How to compile a .cc file into a .o file
-.cc.o:
-	@echo $<
-	@avr-gcc -c $(CPP_FLAGS) $< -o $@
-
-# How to compile a .cpp file into a .o file
-.cpp.o:
-	@echo $<
-	@avr-gcc -c $(CPP_FLAGS) $< -o $@
+# compile .c into .o using generated dependencies
 
 DEPS :=$(OBJS:.o=.d)
 
@@ -237,7 +221,7 @@ DEPS :=$(OBJS:.o=.d)
 # Make the main target of this project.  This target is invoked when the user types
 # 'make' as opposed to 'make <target>.'  This must be the first target in Makefile.
 
-all:  $(TARGET).hex
+all: library $(TARGET).hex
 
 #--------------------------------------------------------------------------------------
 # This rule creates a .hex format downloadable file. A raw binary file which can be
@@ -253,7 +237,7 @@ $(TARGET).hex:  $(TARGET).elf
 # is saved as an ELF debuggable binary.
 
 $(TARGET).elf:  $(OBJS)
-	avr-gcc $(OBJS) -g -mmcu=$(MCU) -o $(TARGET).elf
+	avr-gcc $(OBJS) $(LIB_NAME) -g -mmcu=$(MCU) -o $(TARGET).elf
 
 #--------------------------------------------------------------------------------------
 # This is a dummy target that doesn't do anything. It's included because the author

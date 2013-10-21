@@ -10,6 +10,7 @@
  * into the file for more details. Includes <avr/io.h>, which will pull correct
  * atmel header so long as -mmcu is defined on the compile line. */
 #include "avr_compiler.h"
+#include "clksys_driver.h"
 
 /**** function prototypes *****************************************************/
 
@@ -19,6 +20,13 @@ typedef enum multiplexer_select { mp0, mp1 } mp_select_t;
  *
  * should be called from main to set up the board. */
 void setup(void);
+
+/** \brief Initialize and set cpu and periheral clocks.
+ *
+ * -CPU: 32HMZ
+ * -Peripherals
+ *    -none */
+void setup_clocks(void);
 
 /** \brief Sets up the LEDS.
  *

@@ -26,10 +26,21 @@
 // see header file for documentation
 
 void setup(void) {
+   setup_clocks();
    setup_leds();
    setup_SR_pins();
    setup_signal_pins();
    setup_switches();
+}
+
+void setup_clocks(void) {
+   // set 32MHZ oscillator as CPU clock source
+   CLKSYS_Enable( OSC_RC32MEN_bm );
+   do { nop(); } while ( CLKSYS_IsReady( OSC_RC32MRDY_bm ) == 0 );
+   CLKSYS_Main_ClockSource_Select( CLK_SCLKSEL_RC32M_gc );
+
+   // disable 2MHz and 32KHz oscillators
+   CLKSYS_Disable( OSC_RC2MEN_bm | OSC_RC32KEN_bm);
 }
 
 void setup_leds(void) {
