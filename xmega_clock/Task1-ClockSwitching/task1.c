@@ -19,15 +19,15 @@
 int main(void)
 {
    // Configure switches
-   PORTCFG.MPCMASK = 0xFF; // Configure several PINxCTRL registers at the same time
-   SWITCHPORTL.PIN0CTRL = (SWITCHPORTL.PIN0CTRL & ~PORT_OPC_gm) | PORT_OPC_PULLUP_gc;
-   //Enable pull-up to get a defined level on the switches
+   PORTCFG.MPCMASK = 0xFF; // Configure several PINxCTRL
+   SWITCHPORTL.PIN0CTRL = (SWITCHPORTL.PIN0CTRL & ~PORT_OPC_gm) |
+      PORT_OPC_PULLUP_gc; //Enable pull-up to get defined level on the switches
 
    SWITCHPORTL.DIRCLR = 0xFF; // Set port as input
 
    // Configure LEDs
-   PORTCFG.MPCMASK = 0xFF; // Configure several PINxCTRL registers at the same time
-   LEDPORT.PIN0CTRL = PORT_INVEN_bm; // Invert input to turn the leds on when port output value is 1
+   PORTCFG.MPCMASK = 0xFF; // Configure several PINxCTRL registers
+   LEDPORT.PIN0CTRL = PORT_INVEN_bm; // Invert to turn the leds driven hi
 
    LEDPORT.DIRSET = 0xFF; 	// Set port as output
    LEDPORT.OUT = 0xA1;  // Set initial value

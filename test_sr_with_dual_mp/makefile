@@ -41,8 +41,8 @@ INC_DIR = inc
 
 # Clock frequency of the CPU, in Hz. This number should be an unsigned long integer.
 # For example, 16 MHz would be represented as 16000000UL.
-# F_CPU = 32000000UL # 32MHz
-F_CPU = 2000000UL # 2MHz
+F_CPU = 32000000UL # 32MHz
+# F_CPU = 2000000UL # 2MHz
 
 # These codes are used to switch on debugging modes if they're being used. Several can
 # be placed on the same line together to activate multiple debugging tricks at once.

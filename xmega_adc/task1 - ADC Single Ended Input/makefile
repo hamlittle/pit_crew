@@ -26,23 +26,16 @@
 
 # The name of the program you're building, usually the file which contains main().
 # The name without its extension (.c or .cpp or whatever) must be given here.
-TARGET = test_sr_with_dual_mp
-
-# The name of the folder holding the source files
-SRC_DIR = src
+TARGET = task1
 
 # A list of the source (.c, .cc, .cpp) files in the project, including $(TARGET). Files
 # in library subdirectories do not go in this list; they're automatically in LIB_OBJS
-SRC = $(wildcard $(SRC_DIR)/*.c)
-
-# A list of the header file directories this project depends on. This is only necessary
-# if the project has separate directories for .h and .c files (such as src/ and inc/)
-INC_DIR = inc
+SRC = $(TARGET).c ../adc_driver.c
 
 # Clock frequency of the CPU, in Hz. This number should be an unsigned long integer.
 # For example, 16 MHz would be represented as 16000000UL.
-F_CPU = 32000000UL # 32MHz
-# F_CPU = 2000000UL # 2MHz
+F_CPU = 2000000UL
+# F_CPU = 32000000UL
 
 # These codes are used to switch on debugging modes if they're being used. Several can
 # be placed on the same line together to activate multiple debugging tricks at once.
@@ -103,11 +96,11 @@ MCU = atxmega128a1
 
 # This is the name of the library file which will hold object code which has been
 # compiled from all the source files in the library subdirectories
-LIB_NAME = libpitcrew.a
+LIB_NAME =
 
 # A list of directories in which source files (*.cpp, *.c) and headers (.h) for the
 # library are kept
-LIB_DIRS = lib/atmel
+LIB_DIRS =
 
 #--------------------------------------------------------------------------------------
 # In this section, default settings for fuse bytes are given for each processor which
@@ -173,19 +166,10 @@ C_WARNINGS = -Wall -Wextra -Wshadow -Wpointer-arith -Wbad-function-cast -Wcast-a
 	     -Wsign-compare -Wstrict-prototypes -Wmissing-prototypes -Wunused \
 	     -Wmissing-declarations -Waggregate-return
 
-CPP_WARNINGS = -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align -Wsign-compare \
-	       -Wmissing-declarations -Wunused
-
-C_FLAGS = -D GCC_XMEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
+C_FLAGS = -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
 	  -fsigned-char -funsigned-bitfields -fpack-struct -fshort-enums \
 	  -std=gnu99 -g $(OPTIM) -mmcu=$(MCU) $(OTHERS) $(C_WARNINGS) \
-	  $(patsubst %,-I%,$(LIB_DIRS)) \
-	  $(patsubst %,-I%,$(INC_DIR)) \
-
-CPP_FLAGS = -D GCC_MEGA_AVR -D F_CPU=$(F_CPU) -D _GNU_SOURCE \
-	    -fsigned-char -funsigned-bitfields -fshort-enums \
-	    -g $(OPTIM) -mmcu=$(MCU) $(OTHERS) $(CPP_WARNINGS) \
-	    $(patsubst %,-I%,$(LIB_DIRS))
+	  $(patsubst %,-I%,$(LIB_DIRS))
 
 # This section makes a list of object files from the source files in the SRC list,
 # separating the C++ source files, the C source files, and assembly source files
@@ -206,22 +190,28 @@ LIB_OBJS = $(patsubst %.cpp, %.o, $(filter %.cpp, $(LIB_SRC))) \
 	   $(LIB_ASRC:.S=.o)
 
 #--------------------------------------------------------------------------------------
-# compile .c into .o using generated dependencies
+# Inference rules show how to process each kind of file.
 
-DEPS :=$(OBJS:.o=.d)
-
--include $(DEPS)
-
-%.o: %.c
+# How to compile a .c file into a .o file
+.c.o:
 	@echo $<
-	@avr-gcc $(C_FLAGS) -MM -MT '$@' -MF $(patsubst %.o,%.d,$@) $< #build .d
-	@avr-gcc $(C_FLAGS) -c $< -o $@
+	@avr-gcc -c $(C_FLAGS) $< -o $@
+
+# How to compile a .cc file into a .o file
+.cc.o:
+	@echo $<
+	@avr-gcc -c $(CPP_FLAGS) $< -o $@
+
+# How to compile a .cpp file into a .o file
+.cpp.o:
+	@echo $<
+	@avr-gcc -c $(CPP_FLAGS) $< -o $@
 
 #--------------------------------------------------------------------------------------
 # Make the main target of this project.  This target is invoked when the user types
 # 'make' as opposed to 'make <target>.'  This must be the first target in Makefile.
 
-all: library $(TARGET).hex
+all:  $(TARGET).hex
 
 #--------------------------------------------------------------------------------------
 # This rule creates a .hex format downloadable file. A raw binary file which can be
@@ -335,17 +325,6 @@ clean:
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \
 		rm -f $$subdir/*~; \
-		done
-	@for subdir in $(INC_DIR); do \
-		rm -f $$subdir/*.o; \
-		rm -f $$subdir/*.lst; \
-		rm -f $$subdir/*~; \
-		done
-	@for subdir in $(SRC_DIR); do \
-		rm -f $$subdir/*.o; \
-		rm -f $$subdir/*.lst; \
-		rm -f $$subdir/*~; \
-		rm -f $$subdir/*.d; \
 		done
 	@echo done.
 
