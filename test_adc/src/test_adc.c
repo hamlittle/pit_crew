@@ -20,7 +20,7 @@
 
 /**** include directives ******************************************************/
 
-#include "test_sr_with_dual_mp.h"
+#include "test_adc.h"
 
 /**** function definitions ****************************************************/
 // see header file for documentation
@@ -40,13 +40,19 @@ void setup_clocks(void) {
    do { nop(); } while (!CLKSYS_IsReady(OSC_RC32MRDY_bm)); // wait til stable
    CLKSYS_Main_ClockSource_Select(CLK_SCLKSEL_RC32M_gc);   // select for CPU
 
-   // set internal 32KHz oscillator as source for DFLL and autocalibrate 32MHz
-   CLKSYS_Enable(OSC_RC32KEN_bm);                          //enable
-   do { nop(); } while (!CLKSYS_IsReady(OSC_RC32KRDY_bm)); // wait til stable
-   CLKSYS_AutoCalibration_Enable(OSC_RC32MCREF_bm, false); // false == int 32KHz
+   // disable all presacalers, until we decide otherwise
+   CLKSYS_Prescalers_Config(CLK_PSADIV_1_gc, CLK_PSBCDIV_1_1_gc);
 
-   // disable unused oscillators
-   CLKSYS_Disable(OSC_RC2MEN_bm);
+   // set up external 32KHz oscillator (NOTE: first param is ignored)
+   CLKSYS_XOSC_Config(OSC_FRQRANGE_04TO2_gc, false, OSC_XOSCSEL_32KHz_gc);
+
+   // set internal 32KHz oscillator as source for DFLL and autocalibrate 32MHz
+   CLKSYS_Enable(OSC_XOSCEN_bm);                          //enable
+   do { nop(); } while (!CLKSYS_IsReady(OSC_XOSCRDY_bm)); // wait til stable
+   CLKSYS_AutoCalibration_Enable(OSC_RC32MCREF_bm, true); // true == ext 32KHz
+
+   // disable unused oscillators (internal 2MHz and 32KHz oscillators)
+   CLKSYS_Disable(OSC_RC2MEN_bm | OSC_RC32KEN_bm);
 }
 
 void setup_leds(void) {

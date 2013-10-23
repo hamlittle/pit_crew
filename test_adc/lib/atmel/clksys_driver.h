@@ -72,7 +72,8 @@
  *        can be used to check this.
  *
  *  \param  _oscSel Bitmask of selected clock. Can be one of the following
- *                  OSC_RC2MEN_bm, OSC_RC32MEN_bm, OSC_RC32KEN_bm, OSC_XOSCEN_bm,
+ *                  OSC_RC2MEN_bm, OSC_RC32MEN_bm, OSC_RC32KEN_bm,
+ *                  OSC_XOSCEN_bm,
  *                  OSC_PLLEN_bm.
  */
 #define CLKSYS_Enable( _oscSel ) ( OSC.CTRL |= (_oscSel) )
@@ -84,7 +85,7 @@
  *
  *  \param _oscSel Bitmask of selected clock. Can be one of the following
  *                 OSC_RC2MEN_bm, OSC_RC32MEN_bm, OSC_RC32KEN_bm, OSC_XOSCEN_bm,
- *                 OSC_PLLEN_bm.
+ *                 OSC_PLLEN_bm, or the RDY (replace EN) equivelant.
  *
  *  \return  Non-zero if oscillator is ready and running.
  */
@@ -100,9 +101,10 @@
 /*! \brief This macro disables the automatic calibration of the selected
  *         internal oscillator.
  *
- *  \param _clk  Clock source calibration to disable, either DFLLRC2M or DFLLRC32M.
+ *  \param _clk  Clock source calibration to disable, either DFLLRC2M or
+ *  DFLLRC32M.
  */
-#define CLKSYS_AutoCalibration_Disable( _clk ) ( (_clk).CTRL &= ~DFLL_ENABLE_bm )
+#define CLKSYS_AutoCalibration_Disable( _clk ) ((_clk).CTRL &= ~DFLL_ENABLE_bm)
 
 
 /* Prototyping of function. Detailed information is found in source file. */
