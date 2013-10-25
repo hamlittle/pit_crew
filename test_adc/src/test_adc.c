@@ -22,15 +22,20 @@
 
 #include "test_adc.h"
 
+/**** global variables ********************************************************/
+
+volatile bool ADC_ready = false;
+volatile uint16_t con_result;
+
 /**** function definitions ****************************************************/
 // see header file for documentation
 
-void setup(void) {
+void setup(SPI_Master_t *SPI_master) {
    setup_clocks();
    setup_leds();
    setup_SR_pins();
-   setup_signal_pins();
    setup_switches();
+   setup_adc(SPI_master);
 }
 
 void setup_clocks(void) {
@@ -67,35 +72,43 @@ void setup_SR_pins(void) {
    SR_PORT.OUTCLR = 0xff;     // set to 0 initially
 }
 
-void setup_signal_pins(void) {
-   SIGNAL_PORT.DIR &= ~(SIGNAL_PINS_gm); // set the signal pin as an input
-
-   // pins low by default, signal when high
-   SIGNAL_PORT.SIG0PINCTRL = (SIGNAL_PORT.SIG0PINCTRL & ~PORT_OPC_gm) |
-      PORT_OPC_PULLDOWN_gc;
-   SIGNAL_PORT.SIG1PINCTRL = (SIGNAL_PORT.SIG1PINCTRL & ~PORT_OPC_gm) |
-      PORT_OPC_PULLDOWN_gc;
-}
-
 void setup_switches(void) {
    SWITCHPORTH.DIR &= ~CYCLE_SWITCHES_gm;   // set the sw[6..7] pin as input
    SWITCHPORTH.CHANSEL0SWCTRL |= PORT_OPC_PULLUP_gc; // hitting sw pulls to gnd
    SWITCHPORTH.CHANSEL1SWCTRL |= PORT_OPC_PULLUP_gc; // hitting sw pulls to gnd
 }
 
-void show_channel(mp_select_t mp_select, uint8_t channel) {
-   static int8_t channel0 = 0;
-   static int8_t channel1 = 0;
+void setup_adc(SPI_Master_t* SPI_master) {
+   PORT_t *ssPort = &PORTC;
 
-   if (mp_select == mp0) {
-      channel0 = channel;
-      LEDPORT.OUTCLR = CHANNEL0_LEDS_gm;
-   }
-   else {
-      channel1 = channel;
-      LEDPORT.OUTCLR = CHANNEL1_LEDS_gm;
-   }
-   LEDPORT.OUTSET = channel0 | channel1 << LEDPORT_CHAN1_off;
+   /* Init SS pin as output with wired AND and pull-up. */
+   SPI_PORT.DIRSET = SPI_SS_PIN;
+   SPI_PORT.SPI_SS_PINCTRL = PORT_OPC_WIREDANDPULL_gc;
+
+   /* Set SS output to high (disable SPI) */
+   SPI_PORT.OUTSET = SPI_SS_PIN;
+
+   /* Initialize SPI master on port C. */
+   SPI_MasterInit(SPI_master,
+                  &SPI_module,
+                  &SPI_PORT,
+                  false,
+                  SPI_MODE_2_gc,
+                  SPI_INTLVL_MED_gc,
+                  false,
+                  SPI_PRESCALER_DIV64_gc);
+
+   /* enable /CONVST pin as output */
+   ADC_PORT.DIRSET = ADC_CONVST_PIN;
+
+   /* enable interrupts on PC[1] (J4[2]) for /EOC from ADC */
+   ADC_PORT.DIRCLR = ADC_EOC_PIN; // EOC pin is input
+   ADC_PORT.INTCTRL = PORT_INT0LVL_LO_gc; // enable LO level interrupts...
+   ADC_PORT.INT0MASK |= ADC_EOC_PIN; // on the EOC pin, which signals ready...
+   ADC_PORT.ADC_EOC_PINCTRL = PORT_ISC_FALLING_gc; // when pulled low
+
+   /* enable low and med level interrupts */
+   PMIC.CTRL |= PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm;
 }
 
 void set_channel(mp_select_t mp_select, uint8_t channel) {
@@ -141,71 +154,39 @@ void set_channel(mp_select_t mp_select, uint8_t channel) {
    SR_PORT.OUTCLR = SR_L_CLOCK_PIN_bm; // to dump the output latch
 }
 
-void show_signal(mp_select_t mp_select, uint8_t signal_present) {
-   static bool chan0_toggled = false;
-   static bool chan1_toggled = false;
-
-   // if signal high and not toggled, then toggle to show signal
-   // if signal low and toggled, then revert to showing channel
-   if (mp_select == mp0) {
-      if (signal_present && !chan0_toggled) {
-         LEDPORT.OUTTGL = CHANNEL0_LEDS_gm;
-         chan0_toggled = true;
-      }
-      else if (!signal_present && chan0_toggled) {
-         LEDPORT.OUTTGL = CHANNEL0_LEDS_gm;
-         chan0_toggled = false;
-      }
-   }
-   else {
-      if (signal_present && !chan1_toggled) {
-         LEDPORT.OUTTGL = CHANNEL1_LEDS_gm;
-         chan1_toggled = true;
-      }
-      else if (!signal_present && chan1_toggled) {
-         LEDPORT.OUTTGL = CHANNEL1_LEDS_gm;
-         chan1_toggled = false;
-      }
-   }
+void show_result(uint16_t result) {
+   // map upper 8 bits of 12-bit result (result[11..4]) to LEDS
+   LEDPORT.OUT = (result >> 4) & 0x00FF;
 }
 
 int main(void) {
    uint8_t channel0 = 0;
-   uint8_t channel1 = 0;
-   bool chan0_pushed = 0;
-   bool chan1_pushed = 0;
+   uint8_t channel1 = 15;
+   SPI_Master_t SPI_master;
 
-   setup();
+   /* call all of the setup_* functions */
+   setup(&SPI_master);
+
+   /* enable starting ADC conversions */
+   ADC_ready = true;
 
    set_channel(mp0, channel0);
    set_channel(mp1, channel1);
    while (1)
    {
-      if (!chan0_pushed && (SWITCHPORTH.IN & CYCLE_SWITCH0_bm) == 0) {
-         if (channel0 == 15) {
-            channel0 = -1;
-         }
-         set_channel(mp0, ++channel0);
-         show_channel(mp0, channel0);
-         chan0_pushed = 1;
-      }
-      else if (chan0_pushed && (SWITCHPORTH.IN & CYCLE_SWITCH0_bm)) {
-         chan0_pushed = 0;
-      }
+      show_result(con_result);
 
-      if (!chan1_pushed && (SWITCHPORTH.IN & CYCLE_SWITCH1_bm) == 0) {
-         if (channel1 == 15) {
-            channel1 = -1;
-         }
-         set_channel(mp1, ++channel1);
-         show_channel(mp1, channel1);
-         chan1_pushed = 1;
+      if (ADC_ready) {
+         /* start a new conversion */
+         ADC_PORT.OUTSET |= ADC_CONVST_PIN;
+         ADC_PORT.OUTCLR |= ADC_CONVST_PIN;
       }
-      else if (chan1_pushed && (SWITCHPORTH.IN & CYCLE_SWITCH1_bm)) {
-         chan1_pushed = 0;
-      }
-
-      show_signal(mp0, SIGNAL_PORT.IN & SIGNAL0_PIN_bm);
-      show_signal(mp1, SIGNAL_PORT.IN & SIGNAL1_PIN_bm);
    }
+
+}
+
+/* ADC PORT /EOC interrupt vector */
+ISR(ADC_EOC_INT_VECT) {
+   // TODO: read conversion result using SPI, and save in con_result
+   ADC_ready = true; // allow a new conversion to be started
 }

@@ -11,6 +11,7 @@
  * atmel header so long as -mmcu is defined on the compile line. */
 #include "avr_compiler.h"
 #include "clksys_driver.h"
+#include "spi_driver.h"
 
 /**** function prototypes *****************************************************/
 
@@ -18,8 +19,10 @@ typedef enum multiplexer_select { mp0, mp1 } mp_select_t;
 
 /** \brief Calls all the setup_* functions.
  *
- * should be called from main to set up the board. */
-void setup(void);
+ * should be called from main to set up the board.
+ *
+ * \param SPI_master reference to SPI_master_t to use */
+void setup(SPI_Master_t *SPI_master);
 
 /** \brief Initialize and set cpu and periheral clocks.
  *
@@ -43,22 +46,19 @@ void setup_leds(void);
  *    - GPIO_3 (PD2) = L_Clock  */
 void setup_SR_pins(void);
 
-/** \brief Sets up the signal reading pins.
- *
- * GPIO_4 (PD3) is used to read the value on the signal pin of the first
- * multiplexer (multiplexer0).  GPIO_4 (PD3) is used to read the value on the
- * signal pin of the second multiplexer (multiplexer1).  */
-void setup_signal_pins(void);
-
 /** \brief Sets up the switches.
  *
  * Switch 7 cycles through multiplexer chanels 0..15 */
 void setup_switches(void);
 
-/** \brief Sets LEDS[0..3] to the binary value of the selected channel.
+/** \brief sets up the ADC
  *
- * \param channel which channel is currently selected */
-void show_channel(mp_select_t mp_select, uint8_t channel);
+ * Enables the SPI interface to communicate with the external ADC
+ *
+ * \param SPI_master the SPI_master_t to use
+ *
+ * \note Using and Analog Devices AD7892ANZ-1  */
+void setup_adc(SPI_Master_t *SPI_master);
 
 /** \brief Selects the multiplexer channel.
  *
@@ -74,7 +74,7 @@ void set_channel(mp_select_t mp_select, uint8_t channel);
 /** \brief LEDS[4..7] will be lit if signal evaluates to true.
  *
  * \param signal_present whether a signal is present.  */
-void show_signal(mp_select_t, uint8_t signal_present);
+void show_result(uint16_t result);
 
 #endif /* end of include guard: _TEST_SHIFT_REGISTER_H_ */
 
