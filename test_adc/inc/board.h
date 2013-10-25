@@ -31,24 +31,26 @@
 
 #define SWITCHPORTL         PORTD      ///< Switch Port [0..5]
 #define SWITCHPORTH         PORTR      ///< Switch Port [6..7]
+#define SWITCHPORTL_MASK_gm 0x3F       ///< Pin 0-5 (on PORTD)
+#define SWITCHPORTH_MASK_gm 0x03       ///< Pin 0-1 (on PORTR)
 #define CYCLE_SWITCH0_bm    PIN0_bm    ///< Cycle 0 channel select pin: PORTR[0]
 #define CYCLE_SWITCH1_bm    PIN1_bm    ///< Cycle 1 channel select pin: PORTR[1]
 #define CYCLE_SWITCHES_gm   (CYCLE_SWITCH0_bm | CYCLE_SWITCH1_bm)
+
 #define CHANSEL0SWCTRL      PIN0CTRL   ///< Cycle 0 channel select pin CTRL sfr
 #define CHANSEL1SWCTRL      PIN1CTRL   ///< Cycle 1 channel select pin CTRL sfr
-#define SWITCHPORTL_MASK_gm 0x3F       ///< Pin 0-5 (on PORTD)
-#define SWITCHPORTH_MASK_gm 0x03       ///< Pin 0-1 (on PORTR)
 
-#define SPI_PORT PORTC ///< SPI port
-#define SPI_SS_PIN PIN4 ///< SPI /ss pin: PC[4]
+#define SPI_PORT       PORTC    ///< SPI port
+#define SPI_SS_PIN     PIN4     ///< SPI /ss pin: PC[4]
 #define SPI_SS_PINCTRL PIN4CTRL ///< SPI /ss PINxCTRL sfr
-#define SPI_module SPIC ///< SPI module to use (PORTC)
+#define SPI_module     SPIC     ///< SPI module to use (PORTC)
 
-#define ADC_PORT PORTC ///< ADC port
-#define ADC_CONVST_PIN PIN0_bm ///< /CONVST pin (pull low to start)
-#define ADC_EOC_PIN PIN1_bm ///< /EOC pin (pulled low when ready)
-#define ADC_EOC_PINCTRL PIN1CTRL ///< /EOC pin (pulled low when ready)
-#define ADC_EOC_INT_VECT PORTC_INT0_vect
+#define ADC_PORT         PORTC           ///< ADC port
+#define ADC_CONVST_PIN   PIN0_bm         ///< /CONVST pin (pull low to start)
+#define ADC_EOC_PIN      PIN1_bm         ///< /EOC pin (pulled low when ready)
+#define ADC_EOC_PINCTRL  PIN1CTRL        ///< /EOC pin CTRL sfr
+#define ADC_EOC_INT_VECT PORTC_INT0_vect ///< ADC /EOC interrupt vector
+#define ADC_CON_BYTES    2               ///< ADC conversion result size
 
 
 #define LINES_PER_MP 4 /// 16 channels per mp [0..15] = 4 bits to select

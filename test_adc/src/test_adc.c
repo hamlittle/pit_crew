@@ -25,17 +25,22 @@
 /**** global variables ********************************************************/
 
 volatile bool ADC_ready = false;
-volatile uint16_t con_result;
+SPI_Master_t SPI_master;
+SPI_DataPacket_t data_packet;
+uint8_t dummy_data[ADC_CON_BYTES] = { 0x55, 0x55 }; // MOSI is not connected
+uint8_t ADC_result_buffer[ADC_CON_BYTES];
 
 /**** function definitions ****************************************************/
 // see header file for documentation
 
-void setup(SPI_Master_t *SPI_master) {
+void setup(void) {
+   cli();
    setup_clocks();
    setup_leds();
    setup_SR_pins();
    setup_switches();
-   setup_adc(SPI_master);
+   setup_adc();
+   sei();
 }
 
 void setup_clocks(void) {
@@ -78,34 +83,33 @@ void setup_switches(void) {
    SWITCHPORTH.CHANSEL1SWCTRL |= PORT_OPC_PULLUP_gc; // hitting sw pulls to gnd
 }
 
-void setup_adc(SPI_Master_t* SPI_master) {
-   PORT_t *ssPort = &PORTC;
-
-   /* Init SS pin as output with wired AND and pull-up. */
+void setup_adc() {
+   /* Init SS pin as output with push/pull configuration (set/cleared by MCU) */
    SPI_PORT.DIRSET = SPI_SS_PIN;
-   SPI_PORT.SPI_SS_PINCTRL = PORT_OPC_WIREDANDPULL_gc;
+   SPI_PORT.SPI_SS_PINCTRL = PORT_OPC_TOTEM_gc;
 
    /* Set SS output to high (disable SPI) */
    SPI_PORT.OUTSET = SPI_SS_PIN;
 
    /* Initialize SPI master on port C. */
-   SPI_MasterInit(SPI_master,
-                  &SPI_module,
-                  &SPI_PORT,
-                  false,
-                  SPI_MODE_2_gc,
-                  SPI_INTLVL_MED_gc,
-                  false,
-                  SPI_PRESCALER_DIV64_gc);
+   SPI_MasterInit(&SPI_master,              // SPI_master_t struct to use
+                  &SPI_module,             // SPI module to use (see board.h)
+                  &SPI_PORT,               // SPI port to use (see board.h)
+                  false,                   // lsb_first = false
+                  SPI_MODE_2_gc,           // data on leading falling edge
+                  SPI_INTLVL_MED_gc,       // SPI interrupt priority
+                  false,                   // clock2x = false
+                  SPI_PRESCALER_DIV64_gc); // division scaler (0.5MHz)
 
    /* enable /CONVST pin as output */
    ADC_PORT.DIRSET = ADC_CONVST_PIN;
 
-   /* enable interrupts on PC[1] (J4[2]) for /EOC from ADC */
-   ADC_PORT.DIRCLR = ADC_EOC_PIN; // EOC pin is input
-   ADC_PORT.INTCTRL = PORT_INT0LVL_LO_gc; // enable LO level interrupts...
-   ADC_PORT.INT0MASK |= ADC_EOC_PIN; // on the EOC pin, which signals ready...
-   ADC_PORT.ADC_EOC_PINCTRL = PORT_ISC_FALLING_gc; // when pulled low
+   /* enable interrupts on /EOC for falling edge
+    * (ADC pulls low to signal conversion ready) */
+   ADC_PORT.DIRCLR = ADC_EOC_PIN;                  // EOC pin is input
+   ADC_PORT.ADC_EOC_PINCTRL = PORT_ISC_FALLING_gc; // pulled low when ready
+   ADC_PORT.INT0MASK |= ADC_EOC_PIN;               // enable EOC interupt mask
+   ADC_PORT.INTCTRL = PORT_INT0LVL_LO_gc;          // enable LO level interrupts
 
    /* enable low and med level interrupts */
    PMIC.CTRL |= PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm;
@@ -154,39 +158,59 @@ void set_channel(mp_select_t mp_select, uint8_t channel) {
    SR_PORT.OUTCLR = SR_L_CLOCK_PIN_bm; // to dump the output latch
 }
 
-void show_result(uint16_t result) {
-   // map upper 8 bits of 12-bit result (result[11..4]) to LEDS
-   LEDPORT.OUT = (result >> 4) & 0x00FF;
+void show_result(uint8_t result) {
+   LEDPORT.OUT = result;
 }
 
 int main(void) {
    uint8_t channel0 = 0;
    uint8_t channel1 = 15;
-   SPI_Master_t SPI_master;
 
    /* call all of the setup_* functions */
-   setup(&SPI_master);
+   setup();
 
    /* enable starting ADC conversions */
    ADC_ready = true;
 
    set_channel(mp0, channel0);
    set_channel(mp1, channel1);
+
+   SPI_MasterCreateDataPacket(&data_packet,      // the SPI packet
+                              dummy_data,        // data to be sent
+                              ADC_result_buffer, // result buffer
+                              ADC_CON_BYTES,     // bytes to transceive
+                              &SPI_PORT,          // used by next param
+                              SPI_SS_PIN);       // /ss pin to use
    while (1)
    {
-      show_result(con_result);
+      /* map upper 8 bits of 12-bit result to LEDS this is the lower 4 bits of
+       * the first byte, and the upper 4 bits of the second byte  */
+      show_result((ADC_result_buffer[0] << 4) & (ADC_result_buffer[1] >> 4));
 
       if (ADC_ready) {
-         /* start a new conversion */
-         ADC_PORT.OUTSET |= ADC_CONVST_PIN;
+         /* start a new conversion, EOC interrupt will fire when finished */
+         ADC_ready = false;
+         ADC_PORT.OUTSET |= ADC_CONVST_PIN; // pulled low to start conversion
          ADC_PORT.OUTCLR |= ADC_CONVST_PIN;
       }
-   }
 
+      /* Wait for transmission to complete, result saved in ADC_result_buffer */
+      if (data_packet.complete) {
+         ADC_ready = true;
+      }
+   }
 }
 
-/* ADC PORT /EOC interrupt vector */
+/** \brief ADC PORT /EOC interrupt vector
+ *
+ * /EOC is pulled low when a conversion is ready. In order to get the
+ * conversion result, we start a SPI transmission here, and check for the
+ * complete field of the data packet parameter to
+ * SPI_MasterInterruptTransceivePacket to be true in the main loop. */
 ISR(ADC_EOC_INT_VECT) {
-   // TODO: read conversion result using SPI, and save in con_result
-   ADC_ready = true; // allow a new conversion to be started
+   /* start a transmission, returns after first byte successfully sent */
+   uint8_t status;
+   do {
+      status = SPI_MasterInterruptTransceivePacket(&SPI_master, &data_packet);
+   } while (status != SPI_OK);
 }

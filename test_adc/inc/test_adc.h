@@ -12,6 +12,7 @@
 #include "avr_compiler.h"
 #include "clksys_driver.h"
 #include "spi_driver.h"
+#include "port_driver.h"
 
 /**** function prototypes *****************************************************/
 
@@ -22,7 +23,7 @@ typedef enum multiplexer_select { mp0, mp1 } mp_select_t;
  * should be called from main to set up the board.
  *
  * \param SPI_master reference to SPI_master_t to use */
-void setup(SPI_Master_t *SPI_master);
+void setup(void);
 
 /** \brief Initialize and set cpu and periheral clocks.
  *
@@ -58,7 +59,7 @@ void setup_switches(void);
  * \param SPI_master the SPI_master_t to use
  *
  * \note Using and Analog Devices AD7892ANZ-1  */
-void setup_adc(SPI_Master_t *SPI_master);
+void setup_adc(void);
 
 /** \brief Selects the multiplexer channel.
  *
@@ -71,10 +72,10 @@ void setup_adc(SPI_Master_t *SPI_master);
  * \param channel which channel to select   */
 void set_channel(mp_select_t mp_select, uint8_t channel);
 
-/** \brief LEDS[4..7] will be lit if signal evaluates to true.
+/** \brief Shows upper 8 bit of ADC result on LEDS[0..7]
  *
- * \param signal_present whether a signal is present.  */
-void show_result(uint16_t result);
+ * \param result the upper 8 bits of the ADC result */
+void show_result(uint8_t result);
 
 #endif /* end of include guard: _TEST_SHIFT_REGISTER_H_ */
 

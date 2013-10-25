@@ -73,39 +73,48 @@
 
 /* SPI master status code defines. */
 
-#define SPI_OK              0     /*!< \brief The transmission completed successfully. */
-#define SPI_INTERRUPTED     1     /*!< \brief The transmission was interrupted by another master. */
-#define SPI_BUSY            2     /*!< \brief The SPI module is busy with another transmission. */
+#define SPI_OK              0     /*!< \brief The transmission completed
+                                    successfully. */
+#define SPI_INTERRUPTED     1     /*!< \brief The transmission was interrupted
+                                    by another master. */
+#define SPI_BUSY            2     /*!< \brief The SPI module is busy with
+                                    another transmission. */
 
 
 /*! \brief SPI data packet struct. */
 typedef struct SPI_DataPacket
 {
-	PORT_t *ssPort;                     /*!< \brief Pointer to SS port. */
-	uint8_t ssPinMask;                  /*!< \brief SS pin mask. */
-	const uint8_t *transmitData;        /*!< \brief Pointer to data to transmit. */
-	volatile uint8_t *receiveData;      /*!< \brief Pointer to where to store received data. */
-	volatile uint8_t bytesToTransceive; /*!< \brief Number of bytes to transfer. */
-	volatile uint8_t bytesTransceived;  /*!< \brief Number of bytes transfered. */
-	volatile bool complete;             /*!< \brief Complete flag. */
+   PORT_t *ssPort;                     /*!< \brief Pointer to SS port. */
+   uint8_t ssPinMask;                  /*!< \brief SS pin mask. */
+   const uint8_t *transmitData;        /*!< \brief Pointer to data to transmit.
+   */
+   volatile uint8_t *receiveData;      /*!< \brief Pointer to where to store
+                                         received data. */
+   volatile uint8_t bytesToTransceive; /*!< \brief Number of bytes to transfer.
+   */
+   volatile uint8_t bytesTransceived;  /*!< \brief Number of bytes transfered.
+   */
+   volatile bool complete;             /*!< \brief Complete flag. */
 } SPI_DataPacket_t;
 
 
-/*! \brief SPI master struct. Holds pointer to SPI module, buffers and necessary varibles. */
+/*! \brief SPI master struct. Holds pointer to SPI module, buffers and necessary
+ * varibles. */
 typedef struct SPI_Master
 {
-	SPI_t *module;                /*!< \brief Pointer to what module to use. */
-	PORT_t *port;                 /*!< \brief Pointer to port. */
-	bool interrupted;             /*!< \brief True if interrupted by other master (SS pulled low). */
-	SPI_DataPacket_t *dataPacket; /*!< \brief Holds transceive data. */
+   SPI_t *module;                /*!< \brief Pointer to what module to use. */
+   PORT_t *port;                 /*!< \brief Pointer to port. */
+   bool interrupted;             /*!< \brief True if interrupted by other master
+                                   (SS pulled low). */
+   SPI_DataPacket_t *dataPacket; /*!< \brief Holds transceive data. */
 } SPI_Master_t;
 
 
 /*! \brief SPI slave struct. Holds pointers to SPI module and used port. */
 typedef struct SPI_Slave
 {
-	SPI_t *module;      /*!< \brief Pointer to what module to use. */
-	PORT_t *port;       /*!< \brief Pointer to port. */
+   SPI_t *module;      /*!< \brief Pointer to what module to use. */
+   PORT_t *port;       /*!< \brief Pointer to port. */
 } SPI_Slave_t;
 
 
@@ -120,7 +129,8 @@ typedef struct SPI_Slave
  *  \retval true    The transmission is complete.
  *  \retval false   The transmission is in progress.
  */
-#define SPI_MasterInterruptTransmissionComplete(_spi) ( (_spi)->dataPacket->complete )
+#define SPI_MasterInterruptTransmissionComplete(_spi) \
+   ( (_spi)->dataPacket->complete )
 
 
 
@@ -179,7 +189,7 @@ typedef struct SPI_Slave
 void SPI_MasterInit(SPI_Master_t *spi,
                     SPI_t *module,
                     PORT_t *port,
-					bool lsbFirst,
+                    bool lsbFirst,
                     SPI_MODE_t mode,
                     SPI_INTLVL_t intLevel,
                     bool clk2x,

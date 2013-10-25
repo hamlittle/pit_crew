@@ -18,8 +18,10 @@
  *
  *      Several functions use the following construct:
  *          "some_register = ... | (some_parameter ? SOME_BIT_bm : 0) | ..."
- *      Although the use of the ternary operator ( if ? then : else ) is discouraged,
- *      in some occasions the operator makes it possible to write pretty clean and
+ *      Although the use of the ternary operator ( if ? then : else ) is
+ *      discouraged,
+ *      in some occasions the operator makes it possible to write pretty clean
+ *      and
  *      neat code. In this driver, the construct is used to set or not set a
  *      configuration bit based on a boolean input parameter, such as
  *      the "some_parameter" in the example above.
@@ -96,25 +98,28 @@ void SPI_MasterInit(SPI_Master_t *spi,
                     bool clk2x,
                     SPI_PRESCALER_t clockDivision)
 {
-	spi->module         = module;
-	spi->port           = port;
-	spi->interrupted    = false;
+   spi->module         = module;
+   spi->port           = port;
+   spi->interrupted    = false;
 
-	spi->module->CTRL   = clockDivision |                  /* SPI prescaler. */
-	                      (clk2x ? SPI_CLK2X_bm : 0) |     /* SPI Clock double. */
-	                      SPI_ENABLE_bm |                  /* Enable SPI module. */
-	                      (lsbFirst ? SPI_DORD_bm  : 0) |  /* Data order. */
-	                      SPI_MASTER_bm |                  /* SPI master. */
-	                      mode;                            /* SPI mode. */
+   spi->module->CTRL   = clockDivision |  /* SPI prescaler. */
+      (clk2x ? SPI_CLK2X_bm : 0) |        /* SPI Clock double. */
+      SPI_ENABLE_bm |                     /* Enable SPI module. */
+      (lsbFirst ? SPI_DORD_bm  : 0) |     /* Data order. */
+      SPI_MASTER_bm |                     /* SPI master. */
+      mode;                               /* SPI mode. */
 
-	/* Interrupt level. */
-	spi->module->INTCTRL = intLevel;
+   /* Interrupt level. */
+   spi->module->INTCTRL = intLevel;
 
-	/* No assigned data packet. */
-	spi->dataPacket = NULL;
+   /* No assigned data packet. */
+   spi->dataPacket = NULL;
 
- 	/* MOSI and SCK as output. */
-	spi->port->DIRSET  = SPI_MOSI_bm | SPI_SCK_bm;
+   /* MOSI and SCK as output. */
+   spi->port->DIRSET = SPI_MOSI_bm | SPI_SCK_bm;
+
+   /* MISO as input */
+   spi->port->DIRCLR = SPI_MISO_bm;
 }
 
 
@@ -128,7 +133,8 @@ void SPI_MasterInit(SPI_Master_t *spi,
  *  \param spi                  The SPI_Slave_t instance.
  *  \param module               Pointer to the SPI module.
  *  \param port                 The I/O port where the SPI module is connected.
- *  \param lsbFirst             Data order will be LSB first if this is set to true.
+ *  \param lsbFirst             Data order will be LSB first if this is set to
+ *  true.
  *  \param mode                 SPI mode (Clock polarity and phase).
  *  \param intLevel             SPI interrupt level.
  */
@@ -139,19 +145,22 @@ void SPI_SlaveInit(SPI_Slave_t *spi,
                    SPI_MODE_t mode,
                    SPI_INTLVL_t intLevel)
 {
-	/* SPI module. */
-	spi->module       = module;
-	spi->port         = port;
+   /* SPI module. */
+   spi->module       = module;
+   spi->port         = port;
 
-	spi->module->CTRL = SPI_ENABLE_bm |                /* Enable SPI module. */
-	                    (lsbFirst ? SPI_DORD_bm : 0) | /* Data order. */
-	                    mode;                          /* SPI mode. */
+   spi->module->CTRL = SPI_ENABLE_bm |                /* Enable SPI module. */
+      (lsbFirst ? SPI_DORD_bm : 0) | /* Data order. */
+      mode;                          /* SPI mode. */
 
-	/* Interrupt level. */
-	spi->module->INTCTRL = intLevel;
+   /* Interrupt level. */
+   spi->module->INTCTRL = intLevel;
 
-	/* MISO as output. */
-	spi->port->DIRSET = SPI_MISO_bm;
+   /* MISO as output. */
+   spi->port->DIRSET = SPI_MISO_bm;
+
+   /* MOSI as input */
+   spi->port->DIRCLR = SPI_MOSI_bm;
 }
 
 
@@ -180,13 +189,13 @@ void SPI_MasterCreateDataPacket(SPI_DataPacket_t *dataPacket,
                                 PORT_t *ssPort,
                                 uint8_t ssPinMask)
 {
-	dataPacket->ssPort            = ssPort;
-	dataPacket->ssPinMask         = ssPinMask;
-	dataPacket->transmitData      = transmitData;
-	dataPacket->receiveData       = receiveData;
-	dataPacket->bytesToTransceive  = bytesToTransceive;
-	dataPacket->bytesTransceived   = 0;
-	dataPacket->complete          = false;
+   dataPacket->ssPort            = ssPort;
+   dataPacket->ssPinMask         = ssPinMask;
+   dataPacket->transmitData      = transmitData;
+   dataPacket->receiveData       = receiveData;
+   dataPacket->bytesToTransceive  = bytesToTransceive;
+   dataPacket->bytesTransceived   = 0;
+   dataPacket->complete          = false;
 }
 
 
@@ -201,43 +210,43 @@ void SPI_MasterCreateDataPacket(SPI_DataPacket_t *dataPacket,
  */
 void SPI_MasterInterruptHandler(SPI_Master_t *spi)
 {
-	uint8_t data;
-	uint8_t bytesTransceived = spi->dataPacket->bytesTransceived;
+   uint8_t data;
+   uint8_t bytesTransceived = spi->dataPacket->bytesTransceived;
 
-	/* If SS pin interrupt (SS used and pulled low).
-	*  No data received at this point. */
-	if ( !(spi->module->CTRL & SPI_MASTER_bm) ) {
-		spi->interrupted = true;
-	}
+   /* If SS pin interrupt (SS used and pulled low).
+    *  No data received at this point. */
+   if ( !(spi->module->CTRL & SPI_MASTER_bm) ) {
+      spi->interrupted = true;
+   }
 
-	else {  /* Data interrupt. */
+   else {  /* Data interrupt. */
 
-		/* Store received data. */
-		data = spi->module->DATA;
-		spi->dataPacket->receiveData[bytesTransceived] = data;
+      /* Store received data. */
+      data = spi->module->DATA;
+      spi->dataPacket->receiveData[bytesTransceived] = data;
 
-		/* Next byte. */
-		bytesTransceived++;
+      /* Next byte. */
+      bytesTransceived++;
 
-		/* If more data. */
-		if (bytesTransceived < spi->dataPacket->bytesToTransceive) {
-			/* Put data byte in transmit data register. */
-			data = spi->dataPacket->transmitData[bytesTransceived];
-			spi->module->DATA = data;
-		}
+      /* If more data. */
+      if (bytesTransceived < spi->dataPacket->bytesToTransceive) {
+         /* Put data byte in transmit data register. */
+         data = spi->dataPacket->transmitData[bytesTransceived];
+         spi->module->DATA = data;
+      }
 
-		/* Transmission complete. */
-		else {
+      /* Transmission complete. */
+      else {
 
-			/* Release SS to slave(s). */
-			uint8_t ssPinMask = spi->dataPacket->ssPinMask;
-			SPI_MasterSSHigh(spi->dataPacket->ssPort, ssPinMask);
+         /* Release SS to slave(s). */
+         uint8_t ssPinMask = spi->dataPacket->ssPinMask;
+         SPI_MasterSSHigh(spi->dataPacket->ssPort, ssPinMask);
 
-			spi->dataPacket->complete = true;
-		}
-	}
-	/* Write back bytesTransceived to data packet. */
-	spi->dataPacket->bytesTransceived = bytesTransceived;
+         spi->dataPacket->complete = true;
+      }
+   }
+   /* Write back bytesTransceived to data packet. */
+   spi->dataPacket->bytesTransceived = bytesTransceived;
 }
 
 
@@ -253,54 +262,55 @@ void SPI_MasterInterruptHandler(SPI_Master_t *spi)
  *  \return                   Status code
  *  \retval SPI_OK            The transmission was completed successfully.
  *  \retval SPI_BUSY          The SPI module is busy.
- *  \retval SPI_INTERRUPTED   The transmission was interrupted by another master.
+ *  \retval SPI_INTERRUPTED   The transmission was interrupted by another
+ *  master.
  */
 uint8_t SPI_MasterInterruptTransceivePacket(SPI_Master_t *spi,
                                             SPI_DataPacket_t *dataPacket)
 {
-	uint8_t data;
-	bool interrupted = spi->interrupted;
+   uint8_t data;
+   bool interrupted = spi->interrupted;
 
-	/* If no packets sent so far. */
-	if (spi->dataPacket == NULL) {
-		spi->dataPacket = dataPacket;
-	}
+   /* If no packets sent so far. */
+   if (spi->dataPacket == NULL) {
+      spi->dataPacket = dataPacket;
+   }
 
-	/* If ongoing transmission. */
-	else if (spi->dataPacket->complete == false) {
-		return (SPI_BUSY);
-	}
+   /* If ongoing transmission. */
+   else if (spi->dataPacket->complete == false) {
+      return (SPI_BUSY);
+   }
 
-	/* If interrupted by other master. */
-	else if (interrupted) {
-		/* If SS released. */
-		if (spi->port->OUT & SPI_SS_bm) {
-			/* No longer interrupted. */
-			interrupted = false;
-		}
-		else {
-			return (SPI_INTERRUPTED);
-		}
-	}
+   /* If interrupted by other master. */
+   else if (interrupted) {
+      /* If SS released. */
+      if (spi->port->OUT & SPI_SS_bm) {
+         /* No longer interrupted. */
+         interrupted = false;
+      }
+      else {
+         return (SPI_INTERRUPTED);
+      }
+   }
 
-	/* NOT interrupted by other master.
-	* Start transmission. */
-	spi->dataPacket = dataPacket;
-	spi->dataPacket->complete = false;
-	spi->interrupted = false;
+   /* NOT interrupted by other master.
+    * Start transmission. */
+   spi->dataPacket = dataPacket;
+   spi->dataPacket->complete = false;
+   spi->interrupted = false;
 
-	/* SS to slave(s) low.*/
-	uint8_t ssPinMask = spi->dataPacket->ssPinMask;
-	SPI_MasterSSLow(spi->dataPacket->ssPort, ssPinMask);
+   /* SS to slave(s) low.*/
+   uint8_t ssPinMask = spi->dataPacket->ssPinMask;
+   SPI_MasterSSLow(spi->dataPacket->ssPort, ssPinMask);
 
-	spi->dataPacket->bytesTransceived = 0;
+   spi->dataPacket->bytesTransceived = 0;
 
-	/* Start sending data. */
-	data = spi->dataPacket->transmitData[0];
-	spi->module->DATA = data;
+   /* Start sending data. */
+   data = spi->dataPacket->transmitData[0];
+   spi->module->DATA = data;
 
-	/* Successs */
-	return (SPI_OK);
+   /* Successs */
+   return (SPI_OK);
 }
 
 
@@ -326,17 +336,17 @@ uint8_t SPI_MasterInterruptTransceivePacket(SPI_Master_t *spi,
  */
 uint8_t SPI_MasterTransceiveByte(SPI_Master_t *spi, uint8_t TXdata)
 {
-	/* Send pattern. */
-	spi->module->DATA = TXdata;
+   /* Send pattern. */
+   spi->module->DATA = TXdata;
 
-	/* Wait for transmission complete. */
-	while(!(spi->module->STATUS & SPI_IF_bm)) {
+   /* Wait for transmission complete. */
+   while (!(spi->module->STATUS & SPI_IF_bm)) {
 
-	}
-	/* Read received data. */
-	uint8_t result = spi->module->DATA;
+   }
+   /* Read received data. */
+   uint8_t result = spi->module->DATA;
 
-	return(result);
+   return(result);
 }
 
 
@@ -357,52 +367,52 @@ uint8_t SPI_MasterTransceiveByte(SPI_Master_t *spi, uint8_t TXdata)
 bool SPI_MasterTransceivePacket(SPI_Master_t *spi,
                                 SPI_DataPacket_t *dataPacket)
 {
-	/* Check if data packet has been created. */
-	if(dataPacket == NULL) {
-		return false;
-	}
+   /* Check if data packet has been created. */
+   if (dataPacket == NULL) {
+      return false;
+   }
 
-	/* Assign datapacket to SPI module. */
-	spi->dataPacket = dataPacket;
+   /* Assign datapacket to SPI module. */
+   spi->dataPacket = dataPacket;
 
-	uint8_t ssPinMask = spi->dataPacket->ssPinMask;
+   uint8_t ssPinMask = spi->dataPacket->ssPinMask;
 
-	/* If SS signal to slave(s). */
-	if (spi->dataPacket->ssPort != NULL) {
-		/* SS to slave(s) low. */
-		SPI_MasterSSLow(spi->dataPacket->ssPort, ssPinMask);
-	}
+   /* If SS signal to slave(s). */
+   if (spi->dataPacket->ssPort != NULL) {
+      /* SS to slave(s) low. */
+      SPI_MasterSSLow(spi->dataPacket->ssPort, ssPinMask);
+   }
 
-	/* Transceive bytes. */
-	uint8_t bytesTransceived = 0;
-	uint8_t bytesToTransceive = dataPacket->bytesToTransceive;
-	while (bytesTransceived < bytesToTransceive) {
+   /* Transceive bytes. */
+   uint8_t bytesTransceived = 0;
+   uint8_t bytesToTransceive = dataPacket->bytesToTransceive;
+   while (bytesTransceived < bytesToTransceive) {
 
-		/* Send pattern. */
-		uint8_t data = spi->dataPacket->transmitData[bytesTransceived];
-		spi->module->DATA = data;
+      /* Send pattern. */
+      uint8_t data = spi->dataPacket->transmitData[bytesTransceived];
+      spi->module->DATA = data;
 
-		/* Wait for transmission complete. */
-		while(!(spi->module->STATUS & SPI_IF_bm)) {
+      /* Wait for transmission complete. */
+      while (!(spi->module->STATUS & SPI_IF_bm)) {
 
-		}
-		/* Read received data. */
-		data = spi->module->DATA;
-		spi->dataPacket->receiveData[bytesTransceived] = data;
+      }
+      /* Read received data. */
+      data = spi->module->DATA;
+      spi->dataPacket->receiveData[bytesTransceived] = data;
 
-		bytesTransceived++;
-	}
+      bytesTransceived++;
+   }
 
-	/* If SS signal to slave(s). */
-	if (spi->dataPacket->ssPort != NULL) {
-		/* Release SS to slave(s). */
-		SPI_MasterSSHigh(spi->dataPacket->ssPort, ssPinMask);
-	}
+   /* If SS signal to slave(s). */
+   if (spi->dataPacket->ssPort != NULL) {
+      /* Release SS to slave(s). */
+      SPI_MasterSSHigh(spi->dataPacket->ssPort, ssPinMask);
+   }
 
-	/* Set variables to indicate that transmission is complete. */
-	spi->dataPacket->bytesTransceived = bytesTransceived;
-	spi->dataPacket->complete = true;
+   /* Set variables to indicate that transmission is complete. */
+   spi->dataPacket->bytesTransceived = bytesTransceived;
+   spi->dataPacket->complete = true;
 
-	/* Report success. */
-	return true;
+   /* Report success. */
+   return true;
 }
