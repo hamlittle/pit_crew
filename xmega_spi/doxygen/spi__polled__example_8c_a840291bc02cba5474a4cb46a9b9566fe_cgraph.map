@@ -1,0 +1,7 @@
+<map id="G" name="G">
+<area shape="rect" id="node3" href="$spi__driver_8c.html#a686959cbf2746510fc6243c00e68e375" title="Initialize SPI module as master." alt="" coords="149,5,256,32"/>
+<area shape="rect" id="node5" href="$spi__driver_8c.html#a063ebd338e3bd8ab7dc088eb2a9b06fc" title="Initialize SPI module as slave." alt="" coords="153,56,252,83"/>
+<area shape="rect" id="node7" href="$spi__driver_8c.html#ad76b05bcf9b884215797012fccc67cd9" title="SPI mastertransceive byte." alt="" coords="113,107,292,133"/>
+<area shape="rect" id="node9" href="$spi__driver_8c.html#ae7f66be10b2b5c1bf2d5140ebc20ecc2" title="Create data packet." alt="" coords="105,157,301,184"/>
+<area shape="rect" id="node11" href="$spi__driver_8c.html#aa284d2bee7d1548b5b064b36cfc43bee" title="SPI transceive data packet." alt="" coords="107,208,299,235"/>
+</map>

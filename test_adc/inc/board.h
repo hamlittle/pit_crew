@@ -10,16 +10,18 @@
 #define __XMEGA_A1_XPLAINED__
 
 
-#define LEDPORT           PORTE ///< Port the LEDS are wired to
+#define LEDPORT           PORTE ///< LED port
 #define LEDPORT_CHAN1_off 4     ///< Multiplexer0 = LED[4..7]
-#define CHANNEL0_LEDS_gm  0x0f  ///< LEDs used to show channel select
-#define CHANNEL1_LEDS_gm  0xf0  ///< LEDs used to show channel select
+#define CHANNEL0_LEDS_gm \
+   PIN0_bm | PIN1_bm | PIN2_bm | PIN3_bm  ///< LEDs used to show channel select 
+0
+#define CHANNEL1_LEDS_gm  0xf0  ///< LEDs used to show channel select 1
 
-#define SR_PORT PORTD            ///< Shift Register Port
-#define SR_PINS_gm        0x07  ///< Shift Register Port pins: PortD[0..2]
-#define SR_SER_IN_PIN_bm  0x01  ///< Shift Register SER_IN pin: PD0
-#define SR_CLOCK_PIN_bm   0x02  ///< Shift Register CLOCK pin: PD1
-#define SR_L_CLOCK_PIN_bm 0x04  ///< Shift Register L_CLOCK pin: PD2
+#define SR_PORT PORTD           ///< Shift Register Port
+#define SR_SER_IN_PIN_bm  PIN0_bm  ///< Shift Register SER_IN pin: PD0
+#define SR_CLOCK_PIN_bm   PIN1_bm  ///< Shift Register CLOCK pin: PD1
+#define SR_L_CLOCK_PIN_bm PIN2_bm  ///< Shift Register L_CLOCK pin: PD2
+#define SR_PINS_gm        SR_SER_IN_PIN_bm | SR_CLOCK_PIN_bm | SR_L_CLOCK_PIN_bm
 
 #define SIGNAL_PORT    PORTD    ///< Signal port
 #define SIGNAL0_PIN_bm 0x08     ///< Signal Pin 0: PORTD[3]
