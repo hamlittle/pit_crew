@@ -237,7 +237,6 @@ void SPI_MasterInterruptHandler(SPI_Master_t *spi)
 
       /* Transmission complete. */
       else {
-
          /* Release SS to slave(s). */
          uint8_t ssPinMask = spi->dataPacket->ssPinMask;
          SPI_MasterSSHigh(spi->dataPacket->ssPort, ssPinMask);

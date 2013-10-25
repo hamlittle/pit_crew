@@ -41,9 +41,10 @@
 #define CHANSEL1SWCTRL      PIN1CTRL   ///< Cycle 1 channel select pin CTRL sfr
 
 #define SPI_PORT       PORTC    ///< SPI port
-#define SPI_SS_PIN     PIN4     ///< SPI /ss pin: PC[4]
+#define SPI_SS_PIN     PIN4_bm     ///< SPI /ss pin: PC[4]
 #define SPI_SS_PINCTRL PIN4CTRL ///< SPI /ss PINxCTRL sfr
 #define SPI_module     SPIC     ///< SPI module to use (PORTC)
+#define SPI_INT_vect   SPIC_INT_vect ///< SPI interrupt vector
 
 #define ADC_PORT         PORTC           ///< ADC port
 #define ADC_CONVST_PIN   PIN0_bm         ///< /CONVST pin (pull low to start)
