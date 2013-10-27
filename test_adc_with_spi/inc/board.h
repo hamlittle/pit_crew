@@ -15,11 +15,11 @@
 #define CHANNEL0_LEDS_gm  PIN0_bm | PIN1_bm | PIN2_bm | PIN3_bm ///< chan 0 LEDs
 #define CHANNEL1_LEDS_gm  PIN4_bm | PIN5_bm | PIN6_bm | PIN7_bm ///< chan 1 LEDs
 
-#define SR_PORT           PORTD    ///< Shift Register Port
-#define SR_SER_IN_PIN_bm  PIN0_bm  ///< Shift Register SER_IN pin: PD0
-#define SR_CLOCK_PIN_bm   PIN1_bm  ///< Shift Register CLOCK pin: PD1
-#define SR_L_CLOCK_PIN_bm PIN2_bm  ///< Shift Register L_CLOCK pin: PD2
-#define SR_PINS_gm        SR_SER_IN_PIN_bm | SR_CLOCK_PIN_bm | SR_L_CLOCK_PIN_bm
+#define SR_SPI_PORT       PORTF         ///< SPI port
+#define SR_SPI_SS_PIN     SPI_SS_bm     ///< SPI /ss (L_CLOCK) pin: PC[4]
+#define SR_SPI_SS_PINCTRL PIN4CTRL      ///< SPI /ss PINxCTRL sfr
+#define SR_SPI_module     SPIF          ///< SPI module to use (PORTF)
+#define SR_SPI_INT_vect   SPIF_INT_vect ///< SPI interrupt vector
 
 /* Unused in this test, signal routed from MP1 to ADC Vin1 */
 /* #define SIGNAL_PORT    PORTD    ///< Signal port */
@@ -40,11 +40,11 @@
 #define CHANSEL0SWCTRL      PIN0CTRL   ///< Cycle 0 channel select pin CTRL sfr
 #define CHANSEL1SWCTRL      PIN1CTRL   ///< Cycle 1 channel select pin CTRL sfr
 
-#define SPI_PORT       PORTC    ///< SPI port
-#define SPI_SS_PIN     PIN4_bm     ///< SPI /ss pin: PC[4]
-#define SPI_SS_PINCTRL PIN4CTRL ///< SPI /ss PINxCTRL sfr
-#define SPI_module     SPIC     ///< SPI module to use (PORTC)
-#define SPI_INT_vect   SPIC_INT_vect ///< SPI interrupt vector
+#define ADC_SPI_PORT       PORTC         ///< SPI port
+#define ADC_SPI_SS_PIN     SPI_SS_bm    ///< SPI /ss pin: PC[4]
+#define ADC_SPI_SS_PINCTRL PIN4CTRL      ///< SPI /ss PINxCTRL sfr
+#define ADC_SPI_module     SPIC          ///< SPI module to use (PORTC)
+#define ADC_SPI_INT_vect   SPIC_INT_vect ///< SPI interrupt vector
 
 #define ADC_PORT         PORTC           ///< ADC port
 #define ADC_CONVST_PIN   PIN0_bm         ///< /CONVST pin (pull low to start)
@@ -53,8 +53,9 @@
 #define ADC_EOC_INT_VECT PORTC_INT0_vect ///< ADC /EOC interrupt vector
 #define ADC_CON_BYTES    2               ///< ADC conversion result size
 
-
-#define LINES_PER_MP 4 /// 16 channels per mp [0..15] = 4 bits to select
+#define LINES_PER_MP 4 ///< 16 channels per mp [0..15] = 4 bits to select
+#define NUM_MP       2 ///< using 2 multiplexers
+#define NUM_SR       1 ///> using 1 Shift Register
 
 #define LEDPORT_TIMER0 TCE0
 #define LEDPORT_AWEX AWEXE

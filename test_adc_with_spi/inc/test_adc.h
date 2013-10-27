@@ -45,7 +45,7 @@ void setup_leds(void);
  *    - GPIO_1 (PD0) = SER_IN
  *    - GPIO_2 (PD1) = Clock
  *    - GPIO_3 (PD2) = L_Clock  */
-void setup_SR_pins(void);
+void setup_SR(void);
 
 /** \brief Sets up the switches.
  *
@@ -59,7 +59,7 @@ void setup_switches(void);
  * \param SPI_master the SPI_master_t to use
  *
  * \note Using and Analog Devices AD7892ANZ-1  */
-void setup_adc(void);
+void setup_ADC(void);
 
 /** \brief Selects the multiplexer channel.
  *
