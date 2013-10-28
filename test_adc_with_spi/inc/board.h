@@ -10,63 +10,23 @@
 #define __XMEGA_A1_XPLAINED__
 
 
-#define LEDPORT           PORTE ///< LED port
-#define LEDPORT_CHAN1_off 4     ///< Multiplexer0 = LED[4..7]
-#define CHANNEL0_LEDS_gm  PIN0_bm | PIN1_bm | PIN2_bm | PIN3_bm ///< chan 0 LEDs
-#define CHANNEL1_LEDS_gm  PIN4_bm | PIN5_bm | PIN6_bm | PIN7_bm ///< chan 1 LEDs
+#define LED_PORT PORTE ///< LEDs are wired to PORTE[0..7]
 
-#define SR_SPI_PORT       PORTF         ///< SPI port
-#define SR_SPI_SS_PIN     SPI_SS_bm     ///< SPI /ss (L_CLOCK) pin: PC[4]
-#define SR_SPI_SS_PINCTRL PIN4CTRL      ///< SPI /ss PINxCTRL sfr
-#define SR_SPI_module     SPIF          ///< SPI module to use (PORTF)
-#define SR_SPI_INT_vect   SPIF_INT_vect ///< SPI interrupt vector
-
-/* Unused in this test, signal routed from MP1 to ADC Vin1 */
-/* #define SIGNAL_PORT    PORTD    ///< Signal port */
-/* #define SIGNAL0_PIN_bm 0x08     ///< Signal Pin 0: PORTD[3] */
-/* #define SIGNAL1_PIN_bm 0x10     ///< Signal Pin 0: PORTD[4] */
-/* #define SIGNAL_PINS_gm (SIGNAL0_PIN_bm | SIGNAL1_PIN_bm) */
-/* #define SIG0PINCTRL    PIN3CTRL ///< Signal pin CTRL sfr */
-/* #define SIG1PINCTRL    PIN4CTRL ///< Signal pin CTRL sfr */
-
-#define SWITCHPORTL         PORTD      ///< Switch Port [0..5]
-#define SWITCHPORTH         PORTR      ///< Switch Port [6..7]
-#define SWITCHPORTL_MASK_gm 0x3F       ///< Pin 0-5 (on PORTD)
-#define SWITCHPORTH_MASK_gm 0x03       ///< Pin 0-1 (on PORTR)
-#define CYCLE_SWITCH0_bm    PIN0_bm    ///< Cycle 0 channel select pin: PORTR[0]
-#define CYCLE_SWITCH1_bm    PIN1_bm    ///< Cycle 1 channel select pin: PORTR[1]
-#define CYCLE_SWITCHES_gm   (CYCLE_SWITCH0_bm | CYCLE_SWITCH1_bm)
-
-#define CHANSEL0SWCTRL      PIN0CTRL   ///< Cycle 0 channel select pin CTRL sfr
-#define CHANSEL1SWCTRL      PIN1CTRL   ///< Cycle 1 channel select pin CTRL sfr
-
-#define ADC_SPI_PORT       PORTC         ///< SPI port
-#define ADC_SPI_SS_PIN     SPI_SS_bm    ///< SPI /ss pin: PC[4]
-#define ADC_SPI_SS_PINCTRL PIN4CTRL      ///< SPI /ss PINxCTRL sfr
-#define ADC_SPI_module     SPIC          ///< SPI module to use (PORTC)
-#define ADC_SPI_INT_vect   SPIC_INT_vect ///< SPI interrupt vector
-
-#define ADC_PORT         PORTC           ///< ADC port
-#define ADC_CONVST_PIN   PIN0_bm         ///< /CONVST pin (pull low to start)
-#define ADC_EOC_PIN      PIN1_bm         ///< /EOC pin (pulled low when ready)
-#define ADC_EOC_PINCTRL  PIN1CTRL        ///< /EOC pin CTRL sfr
-#define ADC_EOC_INT_VECT PORTC_INT0_vect ///< ADC /EOC interrupt vector
-#define ADC_CON_BYTES    2               ///< ADC conversion result size
-
-#define LINES_PER_MP 4 ///< 16 channels per mp [0..15] = 4 bits to select
-#define NUM_MP       2 ///< using 2 multiplexers
-#define NUM_SR       1 ///> using 1 Shift Register
+#define SWITCH_PORTL         PORTD      ///< Switch Port [0..5]
+#define SWITCH_PORTH         PORTR      ///< Switch Port [6..7]
+#define SWITCH_PORTL_MASK_gm 0x3F       ///< Pin 0-5 (on PORTD)
+#define SWITCH_PORTH_MASK_gm 0x03       ///< Pin 0-1 (on PORTR)
+#define SWITCH_PORTH_OFFSET  6         ///< Switch Port [6..7] offset
 
 #define LEDPORT_TIMER0 TCE0
 #define LEDPORT_AWEX AWEXE
 
-#define READ_SWITCHES ((SWITCHPORTL.IN & SWITCHPORTL_MASK_gc) | \
+#define READ_SWITCHES ((SWITCHPORTL.IN & SWITCHPORTL_MASK_gm) | \
                        (SWITCHPORTH.IN << SWITCHPORTH_OFFSET))
 
 // Pin 0-1 on PORTR are used to represent Switch 6-7,
 // in order to position the bits rigth in a byte they
 // need to be shifted with an offset
-#define SWITCHPORTH_OFFSET 6
 
 #define TESTPORT PORTC
 

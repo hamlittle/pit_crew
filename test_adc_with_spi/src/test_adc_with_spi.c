@@ -1,66 +1,61 @@
-/** \file test_multiplexer.c
+/** \file test_adc_with_spi.c
  *
+ * \brief Tests the ADC, verifying we can communicate with it, and its
+ * conversion results are reasonable, using the shift_register and adc
+ * libraries.
  *
- * \brief Tests the multiplexer input switching
+ * ### Test Functionality
+ * Channel 15 of MPy is routed to the VINN1 pin of the ADC. ADC conversions are
+ * first performed continuosly, and the upper 8 bits of the result are mapped to
+ * the 8 LEDs onboard. This lasts for 5 (actually 37) seconds, then there is
+ * a 5 second delay when the LEDs are turned off. Next, single conversion mode
+ * is used to get conversion results, and again the upper 8 bits of the result
+ * are mapped to the LEDs. Then, there is another 5 second delay, during which
+ * the LEDs are turn off, and the loop repeats.
  *
- * functionality Use switch 1 to cycle through the various multiplexer inputs.
- * LEDS[0..3] give the binary encoding of the selected channel on the
- * multiplexer. When a +3.3v signal is present on the selected channel,
- * LEDS[4..7] will be lit. Do not use a +5v source, the xmega is not 5v
- * tolerant. S[0..3] go to GPIO[0..3], and SIG goes to GPIO7. Multiplexer can
- * be powered by either +3.3v or +5v.
+ * \note The board wiring, including a voltage divider network, is documented in
+ * the logbook.
  *
- * \author Hamilton Little - hamilton.little@gmail.com
- * Developed for the Pit Crew Team Senior Project, Cal Poly Fall 2013 Code used
- * in this project draws from the example projects for the XMEGAA1 board and
- * the drivers for the XMEGA series, distributed by the Atmel Corporation. The
- * author would like to thank Atmel for their work in developing and supporting
- * the XMEGA chip series, as well as for the sample code and tutorials they
- * provide for the chip */
+ * \author Hamilton Little
+ *         hamilton.little@gmail.com
+ *         Cal Poly ME UGRD class of 2014
+ *
+ * \copyright
+ *       Copyright 2013 Hamilton Little
+ *
+ * \license \verbatim
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0\n
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. \endverbatim */
 
-/**** include directives ******************************************************/
+/* Include Directives *********************************************************/
 
-#include "test_adc.h"
+#include "test_adc_with_spi.h"
 
-/**** global variables ********************************************************/
 
-/** \brief Wait until /EOC is pulled low before new conversion started */
-volatile bool ADC_ready = false;
+/* Global Definitions *********************************************************/
 
-/** \brief ADC SPI master mode struct */
-SPI_Master_t ADC_SPI_master;
+/** \brief The ADC being used by the adc library */
+ADC_ext_t adc;
 
-/** \brief ADC data packet (dummy data, ADC_MOSI is not connected) */
-SPI_DataPacket_t ADC_SPI_data_packet;
+/* function definitions *******************************************************/
 
-/** \brief data to send to ADC (dummy data, ADC_MOSI is not connected) */
-const uint8_t ADC_SPI_MOSI_data[ADC_CON_BYTES] = { 0x55, 0xAA };
+/** \name Board Setup Functions ***********************************************/
+///@{
 
-/** \brief ADC conversion result buffer */
-uint8_t ADC_result_buffer[ADC_CON_BYTES];
-
-/** \brief Shift Register SPI master mode struct */
-SPI_Master_t SR_SPI_master;
-
-/** \brief Shift Register data packet ([0..3] is MP1, [4..7] is MP0) */
-SPI_DataPacket_t SR_SPI_data_packet;
-
-/** \brief Shift Register MISO buffer (unused, SR_MISO is not connected) */
-uint8_t SR_SPI_MISO_buffer;
-
-/**** function definitions ****************************************************/
-// see header file for documentation
-
-void setup(void) {
-   cli();
-   setup_clocks();
-   setup_leds();
-   setup_SR();
-   setup_switches();
-   setup_ADC();
-   sei();
-}
-
+/** \brief Initialize and set cpu and periheral clocks.
+ *
+ * CPU clock frequencies set are:
+ * -CPU: 32HMZ
+ * -Peripheral Prescaling: NONE */
 void setup_clocks(void) {
 
    // set 32MHZ oscillator as CPU clock source
@@ -83,112 +78,146 @@ void setup_clocks(void) {
    CLKSYS_Disable(OSC_RC2MEN_bm | OSC_RC32KEN_bm);
 }
 
-void setup_leds(void) {
-   LEDPORT.DIR = 0xff;                 // set all pins of port E to output
+/** \brief Sets up the LEDS.
+ *
+ * Sets the pins on LED_PORT to inverted output, so setting the corresponding
+ * pin will turn on the LED. Clear the corresponding pin to turn the given LED
+ * off. */
+void setup_LEDs(void) {
+   LED_PORT.DIR = 0xff;                 // set all pins of port E to output
    PORTCFG.MPCMASK = 0xff;             // set for all pins on port E...
-   LEDPORT.PIN0CTRL |= PORT_INVEN_bm;  // inverted output (set hi turns on led)
-   LEDPORT.OUTCLR = 0xff;              // turn all leds off
+   LED_PORT.PIN0CTRL |= PORT_INVEN_bm;  // inverted output (set hi turns on led)
+   LED_PORT.OUTCLR = 0xff;              // turn all leds off
 }
 
-void setup_SR(void) {
-   /* Init SS (L_CLOCK) pin as output with push/pull configuration  */
-   SR_SPI_PORT.DIRSET = SR_SPI_SS_PIN;
-   SR_SPI_PORT.SR_SPI_SS_PINCTRL = PORT_OPC_TOTEM_gc;
-   SR_SPI_PORT.OUTSET = SR_SPI_SS_PIN;
+/** \brief Sets up the switches.
+ *
+ * Switches on the board are normally open, and pull to ground when pushed.
+ * Inverted input is enabled, so the IN register will read high if the switch is
+ * pushed.
+ *
+ * \param[in] switch_mask which switches to enable. */
+void setup_switches(uint8_t switch_mask) {
+   uint8_t maskL = switch_mask & SWITCH_PORTL_MASK_gm;
+   uint8_t maskH = switch_mask >> SWITCH_PORTH_OFFSET;
 
-   /* Initialize SPI master on port C. */
-   SPI_MasterInit(&SR_SPI_master,         // SPI_master_t struct to use
-                  &SR_SPI_module,         // SPI module to use (see board.h)
-                  &SR_SPI_PORT,           // SPI port to use (see board.h)
-                  true,                   // lsb_first = true
-                  SPI_MODE_0_gc,          // data on leading rising edge
-                  SPI_INTLVL_OFF_gc,      // SPI interrupt priority
-                  true,                   // clock2x = true
-                  SPI_PRESCALER_DIV4_gc); // division scaler (15MHz)
+   SWITCH_PORTL.DIR &= ~maskL;
+   PORTCFG.MPCMASK = maskL;
+   SWITCH_PORTL.PIN0CTRL = PORT_OPC_PULLDOWN_gc | PORT_INVEN_bm;
 
-   /* enable low and med level interrupts */
-   PMIC.CTRL |= PMIC_MEDLVLEN_bm;
+   SWITCH_PORTH.DIR &= ~maskH;
+   PORTCFG.MPCMASK = maskH;
+   SWITCH_PORTL.PIN0CTRL = PORT_OPC_PULLDOWN_gc | PORT_INVEN_bm;
 }
 
-void setup_switches(void) {
-   SWITCHPORTH.DIR &= ~CYCLE_SWITCHES_gm;   // set the sw[6..7] pin as input
-   SWITCHPORTH.CHANSEL0SWCTRL |= PORT_OPC_PULLUP_gc; // hitting sw pulls to gnd
-   SWITCHPORTH.CHANSEL1SWCTRL |= PORT_OPC_PULLUP_gc; // hitting sw pulls to gnd
+/** \brief Sets up the Shift Register.
+ *
+ * Shift register is wired to PORTF. /SS pin is wired to L_CLOCK on SPIF (clock
+ * hi to latch output buffer of Shift Register).  This function initializes the
+ * SR_t struct needed for the shift_register library, which handles
+ * communicating with the shift register in a transparent way.
+ *
+ * \param[out] shift_reg the shift register to initialize
+ * \param[in] port the port to use to communicate with the shift register
+ * \param[in] module the SPI module to use  (one of SPIC..SPIF)
+ * \param[in] lsb_first true for transmission order lsb->msb */
+void setup_SR(SR_t *shift_reg, PORT_t *port, SPI_t *module, bool lsb_first) {
+   SR_init(shift_reg, port, module, lsb_first);
 }
 
-void setup_ADC() {
-   /* Init SS pin as output with push/pull configuration (set/cleared by MCU) */
-   ADC_SPI_PORT.DIRSET = ADC_SPI_SS_PIN;
-   ADC_SPI_PORT.ADC_SPI_SS_PINCTRL = PORT_OPC_TOTEM_gc;
-   ADC_SPI_PORT.OUTSET = ADC_SPI_SS_PIN;
-
-   /* enable /CONVST pin as output */
-   ADC_PORT.DIRSET = ADC_CONVST_PIN;
-   ADC_PORT.OUTSET = ADC_CONVST_PIN;
-
-   /* enable interrupts on /EOC for falling edge
-    * (ADC pulls low to signal conversion ready) */
-   ADC_PORT.DIRCLR = ADC_EOC_PIN;                  // EOC pin is input
-   ADC_PORT.ADC_EOC_PINCTRL = PORT_ISC_FALLING_gc; // pulled low when ready
-   ADC_PORT.INT0MASK |= ADC_EOC_PIN;               // enable EOC interupt mask
-   ADC_PORT.INTCTRL = PORT_INT0LVL_LO_gc;          // enable LO level interrupts
-
-   /* Initialize SPI master on port C. */
-   SPI_MasterInit(&ADC_SPI_master,         // SPI_master_t struct to use
-                  &ADC_SPI_module,         // SPI module to use (see board.h)
-                  &ADC_SPI_PORT,           // SPI port to use (see board.h)
-                  false,                   // lsb_first = false
-                  SPI_MODE_2_gc,           // data on leading falling edge
-                  SPI_INTLVL_MED_gc,       // SPI interrupt priority
-                  false,                   // clock2x = false
-                  SPI_PRESCALER_DIV16_gc); // division scaler (2MHz)
-
-   /* SPI is full duplex only, so we have to create a dummy packet in order
-    * to receive data from the ADC  */
-   SPI_MasterCreateDataPacket(&ADC_SPI_data_packet, // dummy data packet
-                              ADC_SPI_MOSI_data,    // dummy data
-                              ADC_result_buffer,    // buffer to save conversion
-                              ADC_CON_BYTES,        // bytes to transceive
-                              &ADC_SPI_PORT,        // needed for next param
-                              ADC_SPI_SS_PIN);      // /SS pin for ADC
-
-   /* enable low and med level interrupts */
-   PMIC.CTRL |= PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm;
+/** \brief Sets up the ADC
+ *
+ * ADC is wired to PORTC on the board. /EOC is PC[1], and /CONVST is PC[0].
+ * This function initializes the ADC_ext_t struct needed for the ADC library,
+ * which handles conversion timing and conversion result communication.
+ *
+ * \note The adc being initialized is a global variable, as this must be
+ * accessed from the ISRs set up to coordinate the communication witht the ADC,
+ * as documented in the adc library.
+ * \sa adc.h
+ *
+ * \param[in] port the port the ADC is wired to
+ * \param[in] module the SPI module to use to communicate with the ADC
+ * \param[in] CONVST_bm bitmask for the /CONVST pin on the given port
+ * \param[in] EOC_bm bitmask for the /EOC pin on the given port
+ * \param[in] callback ADC continuous mode callback function to register */
+void setup_ADC(PORT_t *port, SPI_t *module, uint8_t CONVST_bm, uint8_t EOC_bm,
+               ADC_callback_t callback) {
+   ADC_init(&adc, port, module, CONVST_bm, EOC_bm);
+   ADC_register_continuous_callback(&adc, callback);
 }
 
-void set_channel(mp_select_t mp_select, uint8_t channel) {
-   static uint8_t channel0 = 0;
-   static uint8_t channel1 = 0;
-   uint8_t status;
+///@}
 
-   if (mp_select == mp0) {
-      channel0 = channel;
+/** \brief Selects the multiplexer channel.
+ *
+ * Convenience wrapper around SR_send_byte() which tracks the channel selected
+ * on the x and y multiplexers.
+ *
+ * \param[in] mp_select which multiplexer to set channel
+ * \param[in] channel the channel to select
+ * \param[in] shift_reg the shift register used to select MP channels */
+void set_channel(mp_select_t mp_select, uint8_t channel, SR_t *shift_reg) {
+   static uint8_t x_channel = 0;
+   static uint8_t y_channel = 0;
+   uint8_t combined_channel_select;
+
+   if (mp_select == MPx) {
+      x_channel = channel;
    }
    else {
-      channel1 = channel;
+      y_channel = channel;
    }
-   const uint8_t combined_channel_select =
-      ((channel1 & 0x0F) << 4) | (channel0 & 0x0F);
+   combined_channel_select = ((y_channel & 0x0F) << 4) | (x_channel & 0x0F);
 
-
-   SR_SPI_PORT.OUTCLR = SR_SPI_SS_PIN;
-   SPI_MasterTransceiveByte(&SR_SPI_master, combined_channel_select);
-   SR_SPI_PORT.OUTSET = SR_SPI_SS_PIN;
+   SR_send_byte(shift_reg, combined_channel_select);
 }
 
+/** \brief Shows upper 8 bits of ADC result on LEDS[0..7]
+ *
+ * \param[in] result the upper 8 bits of the ADC result */
 void show_result(uint8_t result) {
-   LEDPORT.OUT = result;
+   LED_PORT.OUT = result;
 }
 
+/** \brief ADC callback function.
+ *
+ * Called by the adc library whenever a conversion completes in continuous
+ * mode. Here, we show the upper 8 bits of the conversion result on the LEDs.
+ *
+ * \param[in] result the latest conversion result */
+void ADC_callback(uint16_t result) {
+   if (PORTD.IN & PIN4_bm) {
+      LED_PORT.OUT = 0xFF;
+   }
+   else {
+      LED_PORT.OUT = (uint8_t)(result >> 4);
+   }
+}
+
+/** \brief main loop to run tests.
+ *
+ * The tests being run are described in the documentation of this file.
+ *
+ * \return never returns, test loop runs ad infinitum. */
 int main(void) {
+   uint8_t switch_mask = 0x00; // Input switches. Read hi when pressed
+   uint16_t result = 0;
+   uint16_t counter;
+   SR_t shift_reg;
+
    /* call all of the setup_* functions */
-   setup();
+   cli();
+   setup_clocks();
+   setup_LEDs();
+   setup_switches(switch_mask);
+   setup_SR(&shift_reg, &SR_PORT, &SR_SPI_MODULE, false);
+   setup_ADC(&ADC_PORT, &ADC_SPI_MODULE, ADC_CONVST_bm, ADC_EOC_bm,
+             ADC_callback);
+   sei();
 
-   /* enable starting ADC conversions */
-   ADC_ready = true;
-
-   set_channel(mp0, 0);
-   set_channel(mp1, 15);
+   set_channel(MPx, 15, &shift_reg);
+   set_channel(MPy, 15, &shift_reg);
 
    /* signal debugging */
    PORTD.DIRCLR |= PIN4_bm;
@@ -196,54 +225,65 @@ int main(void) {
 
    while (1)
    {
-      if (ADC_ready) {
-         // start a new conversion, EOC interrupt will fire when finished
-         ADC_ready = false;
-         delay_us(1); // DO NOT REMOVE, this delay is critical to ADC timing
-         ADC_PORT.OUTCLR = ADC_CONVST_PIN; // pulled low to start conversion
-         ADC_PORT.OUTSET = ADC_CONVST_PIN;
+      /* Test Continuous Conversion mode
+       * Status: Passing */
+      ADC_sample_continuous(&adc);
+
+      /* 5 second delay is actually closer to 37 second delay, because MCU is
+       *   mostly processing conversion results, and not spending any time in
+       *   this loop, as results are coming in so quickly */
+      for (counter = 0; counter < 1000; ++counter) {
+         delay_ms(5);
       }
 
-      // Wait for transmission to complete, result saved in ADC_result_buffer
-      if (PORTD.IN & PIN4_bm) {
-         LEDPORT.OUT = 0xFF;
-      }
-      else if (ADC_SPI_data_packet.complete) {
-         LEDPORT.OUT = (ADC_result_buffer[0]<<4) | (ADC_result_buffer[1]>>4);
-         ADC_ready = true;
+      ADC_stop_continuous(&adc);
+
+      /* 5 second delay */
+      for (counter = 0; counter < 1000; ++counter) {
+         LED_PORT.OUT = 0x00;
+         delay_ms(5);
       }
 
-      /* if (SR_SPI_data_packet.complete) { */
-      /* } */
+      /* Test Single Conversion mode
+       * Status: Passing */
+      for (counter = 0; counter < 1000; ++counter) {
+         delay_ms(5); // run in single conversion for ~ 5 seconds
 
+         if (ADC_ready(&adc)) {
+            // get a new conversion result
+            result = ADC_sample_once(&adc);
+         }
+
+         if (PORTD.IN & PIN4_bm) {
+            LED_PORT.OUT = 0xFF;
+         }
+         else {
+            LED_PORT.OUT = (uint8_t)(result >> 4);
+         }
+      }
+
+      /* 5 second delay */
+      for (counter = 0; counter < 1000; ++counter) {
+         LED_PORT.OUT = 0x00;
+         delay_ms(5);
+      }
    }
 }
 
-/** \brief ADC PORT /EOC interrupt vector
+/** \brief ADC /EOC interrupt vector (PORT.INT0)
  *
- * /EOC is pulled low when a conversion is ready. In order to get the
- * conversion result, we start a SPI transmission here, and check for the
- * complete field of the data packet parameter to
- * SPI_MasterInterruptTransceivePacket to be true in the main loop. */
+ * This interrupt source was configured in the call to ADC_init(), but must be
+ * registered by the user to allow for multiple ADCs to be used in the
+ * system.  */
 ISR(ADC_EOC_INT_VECT) {
-   // start a transmission, returns after first byte successfully sent
-   uint8_t status;
-
-   do {
-      status = SPI_MasterInterruptTransceivePacket(&ADC_SPI_master,
-                                                   &ADC_SPI_data_packet);
-   } while (status != SPI_OK);
+   ADC_EOC_interrupt_handler(&adc);
 }
 
 /** \brief ADC SPI interrupt
  *
- * Calls SPI_MasterInterruptHandler, passing it the SPI_master_t struct used
- * for the SPI communication. The SPI_MasterInterruptHandler takes care of bus
- * arbitration, and transmitting sequential bytes in a packet until the whole
- * packet has been transferred. Transfer is complete when the SPI_DataPacket_t
- * used as a parameter to SPI_MasterCreateDataPacket has been fully
- * transmitted, in which case the complete field of the packet is set, which
- * can be checked in the main loop */
+ * This interrupt source was configured in the call to ADC_init(), but must be
+ * registered by the user to allow for multiple ADCs to be used in the
+ * system. */
 ISR(ADC_SPI_INT_vect) {
-   SPI_MasterInterruptHandler(&ADC_SPI_master);
+   ADC_SPI_interrupt_handler(&adc);
 }

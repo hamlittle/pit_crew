@@ -107,7 +107,7 @@ LIB_NAME = libpitcrew.a
 
 # A list of directories in which source files (*.cpp, *.c) and headers (.h) for the
 # library are kept
-LIB_DIRS = lib/atmel
+LIB_DIRS = lib/atmel lib
 
 #--------------------------------------------------------------------------------------
 # In this section, default settings for fuse bytes are given for each processor which
