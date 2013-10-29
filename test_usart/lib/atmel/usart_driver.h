@@ -84,34 +84,34 @@
 /* \brief USART transmit and receive ring buffer. */
 typedef struct USART_Buffer
 {
-	/* \brief Receive buffer. */
-	volatile uint8_t RX[USART_RX_BUFFER_SIZE];
-	/* \brief Transmit buffer. */
-	volatile uint8_t TX[USART_TX_BUFFER_SIZE];
-	/* \brief Receive buffer head. */
-	volatile uint8_t RX_Head;
-	/* \brief Receive buffer tail. */
-	volatile uint8_t RX_Tail;
-	/* \brief Transmit buffer head. */
-	volatile uint8_t TX_Head;
-	/* \brief Transmit buffer tail. */
-	volatile uint8_t TX_Tail;
+   /* \brief Receive buffer. */
+   volatile uint8_t RX[USART_RX_BUFFER_SIZE];
+   /* \brief Transmit buffer. */
+   volatile uint8_t TX[USART_TX_BUFFER_SIZE];
+   /* \brief Receive buffer head. */
+   volatile uint8_t RX_Head;
+   /* \brief Receive buffer tail. */
+   volatile uint8_t RX_Tail;
+   /* \brief Transmit buffer head. */
+   volatile uint8_t TX_Head;
+   /* \brief Transmit buffer tail. */
+   volatile uint8_t TX_Tail;
 } USART_Buffer_t;
 
 
 /*! \brief Struct used when interrupt driven driver is used.
-*
-*  Struct containing pointer to a usart, a buffer and a location to store Data
-*  register interrupt level temporary.
-*/
+ *
+ *  Struct containing pointer to a usart, a buffer and a location to store Data
+ *  register interrupt level temporary.
+ */
 typedef struct Usart_and_buffer
 {
-	/* \brief Pointer to USART module to use. */
-	USART_t * usart;
-	/* \brief Data register empty interrupt level. */
-	USART_DREINTLVL_t dreIntLevel;
-	/* \brief Data buffer. */
-	USART_Buffer_t buffer;
+   /* \brief Pointer to USART module to use. */
+   USART_t * usart;
+   /* \brief Data register empty interrupt level. */
+   USART_DREINTLVL_t dreIntLevel;
+   /* \brief Data buffer. */
+   USART_Buffer_t buffer;
 } USART_data_t;
 
 
@@ -127,8 +127,8 @@ typedef struct Usart_and_buffer
  *  \param _twoStopBits  Enable two stop bit mode. Use bool type.
  */
 #define USART_Format_Set(_usart, _charSize, _parityMode, _twoStopBits)         \
-	(_usart)->CTRLC = (uint8_t) _charSize | _parityMode |                      \
-	                  (_twoStopBits ? USART_SBMODE_bm : 0)
+   (_usart)->CTRLC = (uint8_t) _charSize | _parityMode |                      \
+(_twoStopBits ? USART_SBMODE_bm : 0)
 
 
 /*! \brief Set USART baud rate.
@@ -142,9 +142,11 @@ typedef struct Usart_and_buffer
  *  	If ScaleFactor >= 0
  *  		BSEL = ((I/O clock frequency)/(2^(ScaleFactor)*16*Baudrate))-1
  *  	If ScaleFactor < 0
- *  		BSEL = (1/(2^(ScaleFactor)*16))*(((I/O clock frequency)/Baudrate)-1)
+ *  		BSEL = (1/(2^(ScaleFactor)*16))*(((I/O clock
+ *  		frequency)/Baudrate)-1)
  *
- *	\note See XMEGA manual for equations for calculation of BSEL value in other
+ *	\note See XMEGA manual for equations for calculation of BSEL value in
+ *	other
  *        modes.
  *
  *  \param _usart          Pointer to the USART module.
@@ -153,9 +155,9 @@ typedef struct Usart_and_buffer
  *  \param _bScaleFactor   USART baud rate scale factor.
  *                         Use uint8_t type
  */
-#define USART_Baudrate_Set(_usart, _bselValue, _bScaleFactor)                  \
-	(_usart)->BAUDCTRLA =(uint8_t)_bselValue;                                           \
-	(_usart)->BAUDCTRLB =(_bScaleFactor << USART_BSCALE0_bp)|(_bselValue >> 8)
+#define USART_Baudrate_Set(_usart, _bselValue, _bScaleFactor)\
+   (_usart)->BAUDCTRLA =(uint8_t)_bselValue;\
+(_usart)->BAUDCTRLB =(_bScaleFactor << USART_BSCALE0_bp)|(_bselValue >> 8)
 
 
 /*! \brief Enable USART receiver.
@@ -195,7 +197,7 @@ typedef struct Usart_and_buffer
  *                       Use USART_RXCINTLVL_t type.
  */
 #define USART_RxdInterruptLevel_Set(_usart, _rxdIntLevel)                      \
-	((_usart)->CTRLA = ((_usart)->CTRLA & ~USART_RXCINTLVL_gm) | _rxdIntLevel)
+   ((_usart)->CTRLA = ((_usart)->CTRLA & ~USART_RXCINTLVL_gm) | _rxdIntLevel)
 
 
 /*! \brief Set USART TXD interrupt level.
@@ -207,7 +209,7 @@ typedef struct Usart_and_buffer
  *                       Use USART_TXCINTLVL_t type.
  */
 #define USART_TxdInterruptLevel_Set(_usart, _txdIntLevel)                      \
-	(_usart)->CTRLA = ((_usart)->CTRLA & ~USART_TXCINTLVL_gm) | _txdIntLevel
+   (_usart)->CTRLA = ((_usart)->CTRLA & ~USART_TXCINTLVL_gm) | _txdIntLevel
 
 
 
@@ -220,7 +222,7 @@ typedef struct Usart_and_buffer
  *                       Use USART_DREINTLVL_t type.
  */
 #define USART_DreInterruptLevel_Set(_usart, _dreIntLevel)                      \
-	(_usart)->CTRLA = ((_usart)->CTRLA & ~USART_DREINTLVL_gm) | _dreIntLevel
+   (_usart)->CTRLA = ((_usart)->CTRLA & ~USART_DREINTLVL_gm) | _dreIntLevel
 
 
 /*! \brief Set the mode the USART run in.
@@ -237,7 +239,7 @@ typedef struct Usart_and_buffer
  *  - 0x3        : Master SPI mode.
  */
 #define USART_SetMode(_usart, _usartMode)                                      \
-	((_usart)->CTRLC = ((_usart)->CTRLC & (~USART_CMODE_gm)) | _usartMode)
+   ((_usart)->CTRLC = ((_usart)->CTRLC & (~USART_CMODE_gm)) | _usartMode)
 
 
 
@@ -245,7 +247,7 @@ typedef struct Usart_and_buffer
  *
  *  \param _usart      The USART module.
  */
-#define USART_IsTXDataRegisterEmpty(_usart) (((_usart)->STATUS & USART_DREIF_bm) != 0)
+#define USART_IsTXDataRegisterEmpty(_usart) ((_usart)->STATUS & USART_DREIF_bm)
 
 
 

@@ -230,6 +230,7 @@ all: library $(TARGET).hex
 $(TARGET).hex:  $(TARGET).elf
 	@avr-objdump -h -S $(TARGET).elf > $(TARGET).lst
 	@avr-objcopy -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
+	@avr-size -C --mcu=atxmega128a1 $(TARGET).elf
 	@avr-size $(TARGET).elf
 
 #--------------------------------------------------------------------------------------

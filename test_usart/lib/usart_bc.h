@@ -45,15 +45,13 @@
 #define USART_BC_PORT       PORTC   ///< USART PORT wired to Board Controller
 #define USART_BC_TXD_PIN_bm PIN3_bm ///< TxD pin bitmask
 
-#define USART_BC_BSEL_9600   ((uint16_t)12) ///< BSEL value for 9600 baud rate
-#define USART_BC_BSCALE_9600 ((uint8_t)4)   ///< BSCALE value for 9600 baud rate
+#define USART_BC_BSEL_9600   ((uint16_t)12) ///< BSEL for 9600 baud rate
+#define USART_BC_BSCALE_9600 ((uint8_t)4)   ///< BSCALE for 9600 baud rate
 
 #define USART_BC_ONE_STOP_BIT false ///< last parameter to USART_Format_Set()
 
 /* Function Prototypes ********************************************************/
 
 /** \name Library Initializer */ ///@{
-static void UART_BC_init(void);
+void USART_BC_init(void);
 ///@}
-
-static int UART_BC_putchar(char c, FILE *stream);
