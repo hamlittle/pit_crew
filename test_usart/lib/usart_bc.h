@@ -1,3 +1,4 @@
+/** \defgroup usart_bc_api USART-USB Board Controller API */ /** @{ */
 /** \file usart_bc.h
  *
  * \brief Sets up the USARTC0 communication with the board controller, enabling
@@ -55,3 +56,4 @@
 /** \name Library Initializer */ ///@{
 void USART_BC_init(void);
 ///@}
+/** @} */ /* end of \defgoup usart_bc_api */

@@ -19,9 +19,9 @@
  *
  *      Some functions use the following construct:
  *          "some_register = ... | (some_parameter ? SOME_BIT_bm : 0) | ..."
- *      Although the use of the ternary operator ( if ? then : else ) is 
+ *      Although the use of the ternary operator ( if ? then : else ) is
  *      discouraged,
- *      in some occasions the operator makes it possible to write pretty clean 
+ *      in some occasions the operator makes it possible to write pretty clean
  *      and
  *      neat code. In this driver, the construct is used to set or not set a
  *      configuration bit based on a boolean input parameter, such as
@@ -71,7 +71,7 @@
 
 /*! \brief Initializes buffer and selects what USART module to use.
  *
- *  Initializes receive and transmit buffer and selects what USART module to 
+ *  Initializes receive and transmit buffer and selects what USART module to
  *  use,
  *  and stores the data register empty interrupt level.
  *
@@ -98,7 +98,7 @@ void USART_InterruptDriver_Initialize(USART_data_t * usart_data,
  *  Set the interrupt level on Data Register interrupt.
  *
  *  \note Changing the DRE interrupt level in the interrupt driver while it is
- *        running will not change the DRE interrupt level in the USART before 
+ *        running will not change the DRE interrupt level in the USART before
  *        the
  *        DRE interrupt have been disabled and enabled again.
  *
@@ -141,6 +141,10 @@ bool USART_TXBuffer_FreeSpace(USART_data_t * usart_data)
  *
  *  \param usart_data The USART_data_t struct instance.
  *  \param data       The data to send.
+ *
+ *  \return if succeeded
+ *  \retval non-zero success
+ *  \retval 0 insufficient space in tx buffer to complete transmission
  */
 bool USART_TXBuffer_PutByte(USART_data_t * usart_data, uint8_t data)
 {
@@ -225,6 +229,8 @@ uint8_t USART_RXBuffer_GetByte(USART_data_t * usart_data)
  *  Stores received data in RX software buffer.
  *
  *  \param usart_data      The USART_data_t struct instance.
+ *
+ *  \return true if usart reception is complete.
  */
 bool USART_RXComplete(USART_data_t * usart_data)
 {

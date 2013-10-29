@@ -1,3 +1,4 @@
+/** \defgroup shift_register_api Shift Register Library API */ /**@{ */
 /** \file shift_register.h
  *
  * \brief Enables interfacing with the shift register in full byte
@@ -45,8 +46,6 @@ typedef struct shift_register_struct  {
    SPI_Master_t *SPI_master; ///< SPI to use, allocated in SR_init()
 } SR_t;
 
-#define SPI_SS_PINCTRL PIN4CTRL ///< PINCTRL register for /SS PIN
-
 /* Function Prototypes ********************************************************/
 
 /** \name Library Initializer */ ///@{
@@ -54,3 +53,4 @@ void SR_init(SR_t *shift_reg, PORT_t *port, SPI_t *module, bool lsb_first);
 ///@}
 
 void SR_send_byte(SR_t *shift_reg, uint8_t byte);
+/** @} */ /* end of \defgoup shift_register_api */

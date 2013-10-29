@@ -1,3 +1,4 @@
+/** \defgroup ADC_API ADC Library API */ /** @{ */
 /** \file adc.h
  *
  * \brief Enables interfacing with the ADC, in continuous and single sampling
@@ -107,7 +108,6 @@ typedef void (*ADC_callback_t)(uint16_t result);
 
 /* Library Definitions ********************************************************/
 
-#define SPI_SS_PINCTRL PIN4CTRL ///< PINCTRL register for /SS PIN
 #define ADC_CON_BYTES 2 ///< ADC conversion result is 2 bytes
 
 /** \brief Contains the static data needed to communicate with the ADC.
@@ -139,3 +139,4 @@ void ADC_stop_continuous(ADC_ext_t *adc);
 uint16_t ADC_sample_once(ADC_ext_t *adc);
 void ADC_SPI_interrupt_handler(ADC_ext_t *adc);
 void ADC_EOC_interrupt_handler(ADC_ext_t *adc);
+/** @} */ /* End of \defgroup ADC_API */

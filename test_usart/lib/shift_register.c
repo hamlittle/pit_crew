@@ -54,7 +54,8 @@ void SR_init(SR_t *shift_reg, PORT_t *port, SPI_t *module, bool lsb_first) {
     * latches the output buffer when clocked high, so the default state for
     * the pin is hi. */
    port->DIRSET = SPI_SS_bm;
-   port->SPI_SS_PINCTRL = PORT_OPC_TOTEM_gc;
+   PORTCFG.MPCMASK = SPI_SS_bm;
+   port->PIN0CTRL = PORT_OPC_TOTEM_gc;
    port->OUTSET = SPI_SS_bm;
 
    /* Initialize the MCU as an SPI master on the given port. */

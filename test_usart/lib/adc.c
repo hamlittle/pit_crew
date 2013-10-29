@@ -62,7 +62,8 @@ void ADC_init(ADC_ext_t *adc, PORT_t *port, SPI_t *module, uint8_t CONVST_bm,
 
    /* Init SS pin as output with push/pull configuration (set/cleared by MCU) */
    port->DIRSET = SPI_SS_bm;
-   port->SPI_SS_PINCTRL = PORT_OPC_TOTEM_gc;
+   PORTCFG.MPCMASK = SPI_SS_bm;
+   port->PIN0CTRL = PORT_OPC_TOTEM_gc;
    port->OUTSET = SPI_SS_bm;
 
    /* enable /CONVST pin as output */

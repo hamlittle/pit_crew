@@ -1,27 +1,4 @@
-/** \file usart_bc.h
- *
- * \brief Sets up the USARTC0 communication with the board controller, enabling
- * printf() functionality to send characters over usb connection.
- *
- * This library intializes the UART channel connected to the Board Controller on
- * the XPLAINED A1 board. After a call to UART_BC_init(), the user can use the
- * stdio.h library printf() function to send characters over the UART channel to
- * the Board Controller, which accepts all standard flags and conversions. The
- * Board Controller, by default, acts as a UART to USB bridge, so any characters
- * sent to it using the printf() function will be transferred to the USB
- * connection. This allows for any machine connected to the usb port to monitor
- * the communications being sent, either by a terminal program or otherwise.
- *
- * Communication is set up with the following parameters:
- * - asynchronous mode
- * - 9600 baud rate
- * - 8 bit frame size, no parity check, 1 stop bit, no flow control
- *
- * This library is blocking while a transfer is ongoing, so transmissions should
- * be kept as short as possible to avoid delays in user code.
- *
- * \todo enable interrupt mode UART transmissions, to avoid blocking while long
- * transmissions are ongoing.
+/** \file usart_bc.c
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
