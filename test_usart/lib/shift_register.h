@@ -1,5 +1,7 @@
 /** \file shift_register.h
- * \brief Shift Register driver.
+ *
+ * \brief Enables interfacing with the shift register in full byte
+ * transmissions.
  *
  * Simplifies setting up and communicating with the 74HC595 shift register.
  * SR_init() must be called before any of the other functions in this library.
@@ -47,5 +49,8 @@ typedef struct shift_register_struct  {
 
 /* Function Prototypes ********************************************************/
 
+/** \name Library Initializer */ ///@{
 void SR_init(SR_t *shift_reg, PORT_t *port, SPI_t *module, bool lsb_first);
+///@}
+
 void SR_send_byte(SR_t *shift_reg, uint8_t byte);

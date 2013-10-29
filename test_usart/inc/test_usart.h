@@ -48,7 +48,7 @@
 #include "clksys_driver.h"
 #include "shift_register.h"
 #include "adc.h"
-#include "usart_driver.h"
+#include "usart_bc.h"
 
 /** \name Wiring Specific Definitions *****************************************/
 ///@{

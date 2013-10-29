@@ -1,34 +1,6 @@
 /** \file adc.c
- * \brief ADC driver library.
  *
- * This library simplifies interfacing with the AD7892ANZ1 Analog to Digital
- * Converter (ADC). ADC_init initializes the library, after which the ADC can be
- * run in continuous or single sampling modes. This library depends on two ISR's
- * which must be registered by the user, explained in the note below.
- *
- * \note This library relies on two ISR's which must be set up by the user: one
- * for the end of conversion (/EOC) pin on the ADC, and the second for the SPI
- * bus used to communicate with the ADC. Each interrupt source is configured in
- * ADC_init (/EOC is configured as INT0 on the given port, SPI is one of the
- * SPIx_INT_vect vectors, whichever corresponds to the SPI port associated with
- * the ADC), however, the user must register the ISR's for each and call
- * ADC_EOC_interrupt_handler() or ADC_SPI_interrupt_handler() appropriately
- * from within them, passing the ADC being used on that port, as in the
- * following examples:
- * \code
- *
- * // user code
- *
- * ISR(PORTx_INT0_vect) {
- *    ADC_EOC_interrupt_handler(adc);
- * }
- *
- * ISR(SPIx_INT_vect) {
- *    ADC_SPI_interrupt_handler(adc);
- * }
- * \endcode
- * where the \c \<x\> in \c PORTx_INT0_vect and \c SPIx_INT_vect are replaced by
- * the appropriate port letters.
+ * \brief ADC driver implementation, see adc.h for full documentation.
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -51,6 +23,7 @@
  * limitations under the License. \endverbatim   */
 
 /* Include Directives *********************************************************/
+
 #include "adc.h"
 
 /* Global Variables ***********************************************************/
@@ -58,8 +31,7 @@
 /** \brief data to send to ADC (dummy data, ADC_MOSI is not connected) */
 const uint8_t ADC_SPI_dummy_data[ADC_CON_BYTES] = { 0x55, 0xAA };
 
-/** \name Library Initializers ************************************************/
-///@{
+/* Function Definitions *******************************************************/
 
 /** \brief Initializes the ADC.
  *
@@ -140,7 +112,6 @@ void ADC_init(ADC_ext_t *adc, PORT_t *port, SPI_t *module, uint8_t CONVST_bm,
 void ADC_register_continuous_callback(ADC_ext_t *adc, ADC_callback_t callback) {
    adc->callback = callback;
 }
-///@}
 
 /** \brief Begins continuous ADC sampling and conversions.
  *

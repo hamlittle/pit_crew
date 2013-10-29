@@ -1,5 +1,7 @@
-/** \file adc.c
- * \brief ADC driver library.
+/** \file adc.h
+ *
+ * \brief Enables interfacing with the ADC, in continuous and single sampling
+ * modes.
  *
  * This library simplifies interfacing with the AD7892ANZ1 Analog to Digital
  * Converter (ADC). ADC_init initializes the library, after which the ADC can be

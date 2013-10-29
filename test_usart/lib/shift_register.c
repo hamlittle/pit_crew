@@ -1,12 +1,7 @@
 /** \file shift_register.c
- * \brief Shift Register driver.
  *
- * Simplifies setting up and communicating with the 74HC595 shift register.
- * SR_init() must be called before any of the other functions in this library.
- * SR_send_byte() performs a single byte transfer, but does not block while the
- * byte is being transferred. Additionally, SR_send_byte() does not perform any
- * bus arbitration, so it is up to the user to ensure that the bus is free, and
- * that any timing requirements are not broken
+ * \brief Shift Register driver implementation, see shift_register.h for full
+ * documentation.
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -31,8 +26,7 @@
 /* Include Directives *********************************************************/
 #include "shift_register.h"
 
-/** \name Library Initializer *************************************************/
-///@{
+/* Function Definitions *******************************************************/
 
 /** \brief Initializes the shift register.
  *
@@ -73,8 +67,6 @@ void SR_init(SR_t *shift_reg, PORT_t *port, SPI_t *module, bool lsb_first) {
                   true,                     // clock2x = true
                   SPI_PRESCALER_DIV4_gc);   // division scaler (SCK=15MHz)
 }
-
-///@}
 
 /** \brief sends the given byte to the shift register.
  *
