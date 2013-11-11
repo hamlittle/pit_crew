@@ -1,29 +1,22 @@
 /** \file test_ext_boards.c
  *
- * \todo Tests that the two boards are wired together correctly, and
- * communication with the boards is possible.
+ * \brief tests that the two boards developed for the project fucntion
+ * correctly.
  *
- * \todo The lower 10 channels on MPx and MPy are constantly scanned, and ADC
- * samples are taken of the voltage levels on these channels. The ADC result is
- * converted to a value of 0-10, and transferred over the USART channel to the
- * Board Controller, so it can be read in a terminal window on the host
- * computer (ADC voltage range is 0-5v, so every 0.5v will increment the
- * transmitted value by 1). A voltage can be applied to any of the 10 pins on
- * the board, and the value should be able to be observed in the terminal
- * window.
+ * Sets MPx and MPy to known channels, to verify we can set them correctly.
+ * Continuously initiated single sample mode conversions on ADC0 and ADC1,
+ * printing the result over the USART-USB gateway so the result can be confirmed
+ * to be accurate.
  *
  * This verifies that we are able to correctly specifiy a channel, start
  * a conversion, and get the result.
  *
  * \note In order to change the channel on MPy (the second board), ADC0 must be
- * read first, so that when reading from ADC1, SR1 is updated. The vice versa is
- * also true: when we want to change the MPx channel selected, we must read from
- * ADC1 first, then ADC0, the SPI transfer during which we are updating SR0
- * (first board, the MPx channel select).
- *
- * \note because we are only sampling the lower 10 channels on MPx, we would
- * only be using 1 ADC. To rectify this, the lower 5 channels of MPx0 and MPx1
- * are sampled instead, to test that both ADCs work correctly.
+ * read first, so that when reading from ADC1, SR1 is updated. If we read from
+ * ADC1 first, it would change the channel on MPy before ADC0 could get
+ * a reading. The vice versa is also true: when we want to change the MPx
+ * channel selected, we must read from ADC1 first, then ADC0, because the SPI
+ * transfer during which we are updating SR0 occurs when we read ADC0.
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -49,10 +42,7 @@
 
 #include "test_ext_boards.h"
 
-
 /* Global Variables ***********************************************************/
-volatile bool first = true;
-
 /** \brief ADC0 connected to MPx0*/
 ADC_ext_t adc0;
 
@@ -62,8 +52,6 @@ ADC_ext_t adc1;
 /** \brief the ADC which is currently undergoing an SPI transfer to receive the
  * conversion result */
 volatile ADC_sel_t current_ADC;
-
-uint8_t led_counter = 0;
 
 /* Function Definitions *******************************************************/
 
@@ -134,17 +122,12 @@ void setup_switches(uint8_t switch_mask) {
  * \note The adc being initialized is a global variable, as this must be
  * accessed from the ISRs set up to coordinate the communication with the ADC,
  * as documented in the adc library.
- * \sa adc.h
- *
- * \param[in] adc0_callback ADC0 continuous mode callback to register
- * \param[in] adc1_callback ADC1 continuous mode callback to register */
-void setup_ADC(ADC_callback_t adc0_callback, ADC_callback_t adc1_callback) {
+ * \sa adc.h */
+void setup_ADC() {
    ADC_init(&adc0, &ADC0_CTRL_PORT, ADC0_CONVST_bm, ADC0_EOC_bm,
             &SPI_PORT, &SPI_MODULE, SPI_SS0_bm);
    ADC_init(&adc1, &ADC1_CTRL_PORT, ADC1_CONVST_bm, ADC1_EOC_bm,
             &SPI_PORT, &SPI_MODULE, SPI_SS1_bm);
-   /* ADC_register_continuous_callback(&adc0, adc0_callback); */
-   /* ADC_register_continuous_callback(&adc1, adc1_callback); */
 }
 
 /** \brief Sets up the USART connection with the Board Controller.
@@ -168,28 +151,6 @@ void show_result(uint8_t result) {
    LED_PORT.OUT = result;
 }
 
-/** \brief ADC callback function.
- *
- * Called by the adc library whenever a conversion completes in continuous
- * mode. Here, we save the result in a buffer, and when the buffer is full, set
- * a flag which lets the main loop know to transfer the conversion results.
- *
- * \param[in] result the latest conversion result */
-void ADC0_callback(uint16_t result) {
-   /* TODO */
-}
-
-/** \brief ADC callback function.
- *
- * Called by the adc library whenever a conversion completes in continuous
- * mode. Here, we save the result in a buffer, and when the buffer is full, set
- * a flag which lets the main loop know to transfer the conversion results.
- *
- * \param[in] result the latest conversion result */
-void ADC1_callback(uint16_t result) {
-   /* TODO */
-}
-
 /** \brief main loop to run tests.
  *
  * The tests being run are described in the documentation of this file.
@@ -200,8 +161,8 @@ int main(void) {
    uint16_t result = 0;
    uint16_t delay_counter = 0;
 
-   const uint8_t MPx_channels[2] = { 0xff, 0xff };
-   const uint8_t MPy_channels[2] = { 0xff, 0xff };
+   const uint8_t MPx_channels[2] = { 0x00, 0x55 };
+   const uint8_t MPy_channels[2] = { 0x00, 0x55 };
 
    /* see if this fixes things */
    PORTF.DIRSET = PIN4_bm;
@@ -212,12 +173,8 @@ int main(void) {
    setup_clocks();
    setup_LEDs();
    setup_switches(switch_mask);
-   setup_ADC(ADC0_callback, ADC1_callback);
+   setup_ADC();
    setup_USART_BC();
-   /* ADC0_CTRL_PORT.OUTCLR = ADC0_CONVST_bm; */
-   /* ADC0_CTRL_PORT.OUTSET = ADC0_CONVST_bm; */
-   ADC1_CTRL_PORT.OUTCLR = ADC1_CONVST_bm;
-   ADC1_CTRL_PORT.OUTSET = ADC1_CONVST_bm;
    sei();
 
    /* signal debugging */
@@ -227,15 +184,18 @@ int main(void) {
 
    while (1) {
 
-      /* start at 0, 0 */
-      /* ADC_set_output_data(&adc0, MPx_channels); */
-      /* result = ADC_sample_once(&adc0); */
-      /* if (PORTC.IN & PIN6_bm) { */
-      /*    LED_PORT.OUT = 0xff; */
-      /* } */
-      /* else { */
-      /*    LED_PORT.OUT = (uint8_t)(result>>4); */
-      /* } */
+      ADC_set_output_data(&adc0, MPx_channels);
+      result = ADC_sample_once(&adc0);
+      if (PORTC.IN & PIN6_bm) {
+         LED_PORT.OUT = 0xff;
+      }
+      else {
+         LED_PORT.OUT = (uint8_t)(result>>4);
+         printf("ADC0: %u\n", result);
+         for (delay_counter = 0; delay_counter < 500; ++delay_counter) {
+            delay_ms(1);
+         }
+      }
 
       ADC_set_output_data(&adc1, MPy_channels);
       result = ADC_sample_once(&adc1);
@@ -244,8 +204,11 @@ int main(void) {
       }
       else {
          LED_PORT.OUT = (uint8_t)(result>>4);
+         printf("ADC1: %u\n", result);
+         for (delay_counter = 0; delay_counter < 500; ++delay_counter) {
+            delay_ms(1);
+         }
       }
-
    }
 }
 

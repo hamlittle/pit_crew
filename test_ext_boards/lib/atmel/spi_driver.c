@@ -71,6 +71,7 @@
  *****************************************************************************/
 #include "spi_driver.h"
 
+/* volatile uint8_t led_counter = 0; */
 
 
 /*! \brief Initialize SPI module as master.

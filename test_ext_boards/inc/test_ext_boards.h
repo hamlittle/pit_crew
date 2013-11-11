@@ -60,7 +60,11 @@
 
 /* Typedefs, Enums, and Structs ***********************************************/
 
-typedef enum ADC_selection { ADC0, ADC1 } ADC_sel_t;
+/** \brief The two ADC's being used */
+typedef enum ADC_selection {
+   ADC0, ///< ADC0 is connected to MPx0
+   ADC1  ///< ADC1 is connected to MPx1
+} ADC_sel_t;
 
 /** \brief The two multiplexers being used. */
 typedef enum multiplexer_select {
@@ -75,14 +79,11 @@ typedef enum multiplexer_select {
 void setup_clocks(void);
 void setup_LEDs(void);
 void setup_switches(uint8_t switch_mask);
-void setup_ADC(ADC_callback_t adc0_callback, ADC_callback_t adc1_callback);
+void setup_ADC(void);
 void setup_USART_BC(void);
 ///@}
 
-void set_channel(mp_select_t mp_select, uint8_t channel, SR_t *shift_reg);
 void show_result(uint8_t result);
-void ADC0_callback(uint16_t result);
-void ADC1_callback(uint16_t result);
 
 #endif /* end of include guard: _TEST_USART_H_ */
 

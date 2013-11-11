@@ -41,10 +41,12 @@
  * for performance reasons.
  *
  * \param[out] adc the adc to initialize
- * \param[in] port the port the ADC is wired to
- * \param[in] module the SPI module to use to communicate with the ADC
- * \param[in] CONVST_bm bitmask for the /CONVST pin on the given port
- * \param[in] EOC_bm bitmask for the /EOC pin on the given port */
+ * \param[in] control_port pointer to the control port for the ADC
+ * \param[in] CONVST_bm /CONVST pin bit mask (on control_port)
+ * \param[in] EOC_bm /EOC pin bit mask (on control_port)
+ * \param[in] SPI_port pointer to the SPI port for the ADC
+ * \param[in] SPI_module the SPI module to use
+ * \param[in] RFS_bm /RFS pin bit mask (on SPI_port) */
 void ADC_init(ADC_ext_t *adc,
               PORT_t *control_port, uint8_t CONVST_bm, uint8_t EOC_bm,
               PORT_t *SPI_port, SPI_t *SPI_module, uint8_t RFS_bm) {
@@ -60,6 +62,14 @@ void ADC_init(ADC_ext_t *adc,
    adc->continuous = false;
    adc->callback = NULL;
 
+   /* enable /CONVST pin as output */
+   control_port->DIRSET = CONVST_bm;
+   PORTCFG.MPCMASK = CONVST_bm;
+   control_port->PIN0CTRL = PORT_OPC_TOTEM_gc;
+   control_port->OUTSET = CONVST_bm;
+   control_port->OUTCLR = CONVST_bm;
+   control_port->OUTSET = CONVST_bm;
+
    /* Init /RFS pin as output with push/pull configuration */
    SPI_port->DIRSET = RFS_bm;
    PORTCFG.MPCMASK = RFS_bm;
@@ -68,9 +78,6 @@ void ADC_init(ADC_ext_t *adc,
    SPI_port->OUTCLR = RFS_bm;
    SPI_port->OUTSET = RFS_bm;
 
-   /* enable /CONVST pin as output */
-   control_port->DIRSET = CONVST_bm;
-   control_port->OUTSET = CONVST_bm;
 
    /* Initialize SPI master on port C, which also sets up SPI interrupt */
    SPI_MasterInit(adc->SPI_master,         // SPI_master_t struct to use
@@ -92,6 +99,7 @@ void ADC_init(ADC_ext_t *adc,
 
    /* enable low and med level interrupts */
    PMIC.CTRL |= PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm;
+
 }
 
 /** \brief Registers the callback function for continuous sampling mode
@@ -167,13 +175,13 @@ uint16_t ADC_sample_once(ADC_ext_t *adc) {
    adc->ready = false;
    adc->control_port->OUTCLR = adc->CONVST_bm;
    delay_ms(1); // if ADC stops working, try uncommenting this line
+   adc->control_port->OUTSET = adc->CONVST_bm;
 
    /* wait for conversion to finish */
    while (!adc->ready){
       nop();
    }
 
-   adc->control_port->OUTSET = adc->CONVST_bm;
    return ADC_get_last_result(adc);
 }
 
@@ -249,11 +257,18 @@ void ADC_SPI_interrupt_handler(ADC_ext_t *adc) {
  * the falling edge of EOC, using INT0 of the port associated with the ADC, as
  * described in this file's documentation.
  *
+ * \note Due to an unknown bug, care must be taken that this function is
+ * <em>never</em> called while there is an ongoing SPI communication with the
+ * ADC.
+ *
  * \param[in] adc The ADC which has signalled EOC */
 void ADC_EOC_interrupt_handler(ADC_ext_t *adc) {
    uint8_t status;
 
-   /* adc->SPI_master->dataPacket->complete = true; */
+   /* due to an unknown bug, this is not being set properly by the SPI library.
+    * This fix is a hack, and relies on the fact that this function will only be
+    * called while there is not an ongoing transfer. */
+   adc->SPI_master->dataPacket->complete = true;
 
    /* initiate a data transfer to get the conversion result */
    do {
