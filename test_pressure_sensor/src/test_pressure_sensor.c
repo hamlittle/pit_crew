@@ -171,15 +171,14 @@ void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]){
       /* set the y channel, but don't use the conversion result */
       ADC_set_output_data(&adc1, MPy_channels+y_channel);
       ADC_sample_once(&adc1);
-      for (x_channel = 0; x_channel < NUM_MPX_CHANS / 2; ++x_channel) {
+      for (x_channel = 0; x_channel < (NUM_MPX_CHANS / 2); ++x_channel) {
 
          /* stay on the same y channel */
          ADC_set_output_data(&adc1, MPy_channels+y_channel);
-         readings[y_channel][x_channel + NUM_MPX_CHANS/2] =
+         readings[y_channel][x_channel + (NUM_MPX_CHANS/2)] =
             ADC_sample_once(&adc1);
 
-
-         if (x_channel == NUM_MPX_CHANS / 2 - 1) { /* set channel back to 0 */
+         if (x_channel == (NUM_MPX_CHANS / 2) - 1) { /* set channel back to 0 */
             ADC_set_output_data(&adc0, MPx_channels+0);
          }
          else { /* increase to the next mpx channel */
@@ -195,13 +194,13 @@ void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]){
 }
 
 void print_results(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS],
-                   uint16_t compensations[NUM_MPY_CHANS][NUM_MPX_CHANS]){
-   uint8_t y_channel, x_channel;
+                   uint16_t compensations[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
+   int8_t y_channel, x_channel;
    uint16_t reading, compensation, diff;
 
    for (y_channel = 0; y_channel < NUM_MPY_CHANS; ++y_channel) {
       printf("\n");
-      for (x_channel = 0; x_channel < NUM_MPX_CHANS; ++x_channel) {
+      for (x_channel = NUM_MPX_CHANS - 1; x_channel >= 0 ; --x_channel) {
          reading = readings[y_channel][x_channel];
          compensation = compensations[y_channel][x_channel];
 
@@ -212,6 +211,17 @@ void print_results(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS],
             diff = reading-compensation;
          }
          printf("%3u ", diff / 2); /* reduces range to 3 digit number */
+      }
+   }
+}
+
+void print_buffer(uint16_t buffer[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
+   int8_t y_channel, x_channel;
+
+   for (y_channel = 0; y_channel < NUM_MPY_CHANS; ++y_channel) {
+      printf("\n");
+      for (x_channel = NUM_MPX_CHANS - 1; x_channel >= 0 ; --x_channel) {
+         printf("%3u ", buffer[y_channel][x_channel] / 2);
       }
    }
 }
@@ -244,11 +254,19 @@ int main(void) {
 
    while (1) {
 
+      if (PORTC.IN & PIN6_bm) {
+         LED_PORT.OUT = 0xff;
+      }
+      else {
+         LED_PORT.OUT = 0x00;
+      }
+
       if ((SWITCH_PORTL.IN & COMPENSATION_SWITCH_bm)
           && !compensation_switch_pushed) {
          compensation_switch_pushed = true;
 
          scan_all(compensation_buffer);
+         print_buffer(compensation_buffer);
       }
       else if (!(SWITCH_PORTL.IN & COMPENSATION_SWITCH_bm)) {
          compensation_switch_pushed = false;
