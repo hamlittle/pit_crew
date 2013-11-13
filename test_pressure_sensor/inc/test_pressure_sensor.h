@@ -44,8 +44,8 @@
 #define NUM_MPX_CHANS 28 ///< Number of x-position channels
 #define NUM_MPY_CHANS 24 ///< Number of y-position channels
 
-#define COMPENSATION_SWITCH_bm PIN4_bm
-#define SCAN_SWITCH_bm PIN5_bm
+#define COMPENSATION_SWITCH_bm PIN4_bm ///< Start compensation scan switch
+#define SCAN_SWITCH_bm PIN5_bm         ///< Start full sensor scan switch
 
 /** \brief The channels which can be selected on the x position multiplexer.
  *
@@ -73,6 +73,11 @@ const uint8_t MPx_channels[(NUM_MPX_CHANS / 2) + 1] =
  * any given time. in order to facilitate this, When the channel being selected
  * is in the range of MPy0, MPy1 is set to channel 15, which is disconnected,
  * and vice versa.
+ *
+ * Additionally, the upper 4 bits are mapped to MPy0, and the lower 4 to MPy1,
+ * because the ADC is set up to transfer from MSB->LSB, so we must mirror this
+ * with the Multiplexers, and the upper 4 bits go to the lower multiplexer, and
+ * vice versa.
  *
  * \note Because the ADC conversion result is 2 bytes, two bytes must be
  * transferred out on the SPI bus to control the MPy channel selected. In this
@@ -136,6 +141,7 @@ void setup_USART_BC(void);
 void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]);
 void print_results(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS],
                    uint16_t compensations[NUM_MPY_CHANS][NUM_MPX_CHANS]);
+void print_buffer(uint16_t buffer[NUM_MPY_CHANS][NUM_MPX_CHANS]);
 
 #endif /* end of include guard: _TEST_USART_H_ */
 

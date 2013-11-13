@@ -154,7 +154,25 @@ void setup_USART_BC(void) {
    USART_BC_init();
 }
 
-void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]){
+/** \brief Scans all 672 pressure sensor elements, and saves the result in the
+ * given buffer.
+ *
+ * Scanning is performed by synchronizing the order of ADC conversions to
+ * adjust the sensor element being scanned appropriately (to change MPy
+ * channel, read from ADC1, and MPx channel is updated when reading from ADC0.
+ * This is because both ADCs and both MPs are on the same SPI bus, but SS0
+ * controls ADC0 and MPx, and SS1 controls ADC1 and MPy). The conversion result
+ * is saved in the given buffer.
+ *
+ * \note The memory for the buffer is assumed to have been allocated
+ * appropriately.
+ *
+ * \note The conversion results saved in the given buffer are right adjusted,
+ * 12-bit integers, which are not sign extended (MSB->LSB = 4x leading 0's,
+ * sign bit, then the 11 bit conversion result)
+ *
+ * \param[out] readings Buffer to save the sensor readings in */
+void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
    uint8_t y_channel, x_channel;
 
    /* show that a reading is taking place */
@@ -178,7 +196,8 @@ void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]){
          readings[y_channel][x_channel + (NUM_MPX_CHANS/2)] =
             ADC_sample_once(&adc1);
 
-         if (x_channel == (NUM_MPX_CHANS / 2) - 1) { /* set channel back to 0 */
+         if (x_channel == (NUM_MPX_CHANS / 2) - 1) { /* set channel back to
+                                                        0 */
             ADC_set_output_data(&adc0, MPx_channels+0);
          }
          else { /* increase to the next mpx channel */
@@ -193,6 +212,18 @@ void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]){
    return;
 }
 
+/** \brief Prints the results of a full sensor conversion scan.
+ *
+ * This function handles subtracting the compensation readings from the actual
+ * sensor readings, and prints the results to a terminal window using the
+ * USART-USB gateway on the development board. Additionally, the order in which
+ * the elements are printed are manipulated in order to align the position of
+ * the reading displayed with where the reading physically took place on the
+ * sensor (x,y position of the printed result matches the x,y position on the
+ *         sensor) to facilitate debugging and correct sensor operation.
+ *
+ * \param[in] readings Full sensor scan readings result buffer
+ * \param[in] compensations Compensation values buffer */
 void print_results(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS],
                    uint16_t compensations[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
    int8_t y_channel, x_channel;
@@ -210,11 +241,17 @@ void print_results(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS],
          else {
             diff = reading-compensation;
          }
-         printf("%3u ", diff / 2); /* reduces range to 3 digit number */
+         printf("%3u ", diff); /* diff is 11 bits, so value is 0-1024 */
       }
    }
 }
 
+/** \brief Prints the contents of the given buffer.
+ *
+ * This function aids in debugging the application so the user can observe the
+ * direct contents of the given buffer.
+ *
+ * \param[in] buffer The pressure sensor scan buffer to print out */
 void print_buffer(uint16_t buffer[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
    int8_t y_channel, x_channel;
 
