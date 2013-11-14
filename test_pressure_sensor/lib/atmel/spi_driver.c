@@ -340,8 +340,8 @@ uint8_t SPI_MasterTransceiveByte(SPI_Master_t *spi, uint8_t TXdata)
 
    /* Wait for transmission complete. */
    while (!(spi->module->STATUS & SPI_IF_bm)) {
-
    }
+
    /* Read received data. */
    uint8_t result = spi->module->DATA;
 

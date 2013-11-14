@@ -26,7 +26,11 @@
 
 #include "adc.h"
 
-/* Global Variables ***********************************************************/
+/* Macro Definitions **********************************************************/
+
+/** \brief How many bytes to transfer out when changing the ADC channel via
+ * ADC_reset_channel(). */
+#define CHAN_SEL_BYTES 1
 
 /* Function Definitions *******************************************************/
 
@@ -196,7 +200,7 @@ uint16_t ADC_sample_once(ADC_ext_t *adc) {
  * which is reading data off the bus.
  *
  * \param[in] adc The ADC whose output SPI packet is to be set
- * \param[in] data data to transmit */
+ * \param[in] data data to transmit (2 bytes) */
 void ADC_set_output_data(ADC_ext_t *adc, const uint8_t *data) {
    SPI_MasterCreateDataPacket(adc->data_packet,   // where to save data packet
                               data,               // SR data to send
@@ -206,11 +210,38 @@ void ADC_set_output_data(ADC_ext_t *adc, const uint8_t *data) {
                               adc->RFS_bm);       // /SS pin for ADC
 }
 
+/** \brief Resets the channel the ADC is reading to 0.
+ *
+ * Convenience function for resetting the ADC back to channel 0. Takes less
+ * time than performing a conversion result to reset the channel, as this
+ * requires using the ADC_set_output_data() function in conjunction with
+ * completing a conversion. Instead, this function simply sends the channel
+ * select directly to the Shift Register controlling the ADC's Multiplexer
+ * channel select
+ *
+ * \param[in] adc The ADC whose channel to reset */
+void ADC_reset_channel(ADC_ext_t *adc) {
+   SPI_DataPacket_t data_packet;
+   const uint8_t data = 0x00;
+   uint8_t dummy_buffer[1];
+
+   SPI_MasterCreateDataPacket(&data_packet,   // where to save data packet
+                              &data,               // SR data to send
+                              dummy_buffer, // buffer to save conversion
+                              CHAN_SEL_BYTES,      // bytes to transceive
+                              adc->SPI_port,      // needed for next param
+                              adc->RFS_bm);       // /SS pin for ADC
+   SPI_MasterTransceivePacket(adc->SPI_master, &data_packet);
+   return;
+}
+
 /** \brief ADC SPI interrupt Handler.
  *
- * This function first passes control over to the SPI_MasterInterruptHandler(),
+ * This function first passes control over to the
+ * SPI_MasterInterruptHandler(),
  * which takes care of bus arbitration and sequential byte transfers from the
- * ADC. When the SPI transfer is complete, the result is stored in a temporary
+ * ADC. When the SPI transfer is complete, the result is stored in
+ * a temporary
  * buffer, which will be overwritten on the next conversion.
  *
  * In continuous mode, the registered callback will be called so the user can
@@ -233,18 +264,22 @@ void ADC_SPI_interrupt_handler(ADC_ext_t *adc) {
    /* check if transmission is complete */
    if (SPI_MasterInterruptTransmissionComplete(adc->SPI_master)) {
       if (adc->continuous) {
-         /* let the user know a sample is ready, conversion result is stored in
+         /* let the user know a sample is ready, conversion result is stored
+          * in
           * adc->result_buffer by SPI driver */
          adc->callback(ADC_get_last_result(adc));
 
          /* start a new conversion */
-         /* delay_us(1); // if ADC stops working, try uncommenting this line */
+         /* delay_us(1); // if ADC stops working, try uncommenting this line
+          * */
          adc->control_port->OUTCLR = adc->CONVST_bm;
          adc->control_port->OUTSET = adc->CONVST_bm;
       }
       else {
-         /* ADC_sample_once is busy waiting for the adc->ready flag to be set.
-          * Conversion result is stored in adc->result_buffer by SPI driver. */
+         /* ADC_sample_once is busy waiting for the adc->ready flag to be
+          * set.
+          * Conversion result is stored in adc->result_buffer by SPI driver.
+          * */
          adc->ready = true;
       }
    }
@@ -257,7 +292,8 @@ void ADC_SPI_interrupt_handler(ADC_ext_t *adc) {
  * SPI_MasterInterruptTransceivePacket().
  *
  * \note This function should be called from the ISR registered to trigger on
- * the falling edge of EOC, using INT0 of the port associated with the ADC, as
+ * the falling edge of EOC, using INT0 of the port associated with the ADC,
+ * as
  * described in this file's documentation.
  *
  * \note Due to an unknown bug, care must be taken that this function is
@@ -268,8 +304,10 @@ void ADC_SPI_interrupt_handler(ADC_ext_t *adc) {
 void ADC_EOC_interrupt_handler(ADC_ext_t *adc) {
    uint8_t status;
 
-   /* due to an unknown bug, this is not being set properly by the SPI library.
-    * This fix is a hack, and relies on the fact that this function will only be
+   /* due to an unknown bug, this is not being set properly by the SPI
+    * library.
+    * This fix is a hack, and relies on the fact that this function will only
+    * be
     * called while there is not an ongoing transfer. */
    adc->SPI_master->dataPacket->complete = true;
 

@@ -3,9 +3,9 @@
  *
  * \brief Enables interfacing with the ADC, in continuous and single sampling
  * modes.
- *
- * This library simplifies interfacing with the AD7892ANZ1 Analog to Digital
- * Converter (ADC). ADC_init initializes the library, after which the ADC can be
+ * * This library simplifies interfacing with the AD7892ANZ1 Analog to Digital
+ * * Converter (ADC). ADC_init initializes the library, after which the ADC can
+ * be
  * run in continuous or single sampling modes. This library depends on two ISR's
  * which must be registered by the user, explained in the note below.
  *
@@ -53,9 +53,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. \endverbatim   */
 
+#ifndef _ADC_H_
+#define _ADC_H_
+
 /* Include Directives *********************************************************/
 #include "spi_driver.h"
-#include "board.h"
+#include "shift_register.h"
 
 /** \name Macro Defined Functions *********************************************/
 ///@{
@@ -142,6 +145,9 @@ void ADC_sample_continuous(ADC_ext_t *adc);
 void ADC_stop_continuous(ADC_ext_t *adc);
 uint16_t ADC_sample_once(ADC_ext_t *adc);
 void ADC_set_output_data(ADC_ext_t *adc, const uint8_t *data);
+void ADC_reset_channel(ADC_ext_t *adc);
 void ADC_SPI_interrupt_handler(ADC_ext_t *adc);
 void ADC_EOC_interrupt_handler(ADC_ext_t *adc);
+
+#endif /* end of include guard: _ADC_H_ */
 /** @} */ /* End of \defgroup ADC_API */

@@ -33,6 +33,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. \endverbatim */
 
+#ifndef _USART_BC_H_
+#define _USART_BC_H_
+
 /* Include Directives *********************************************************/
 
 #include <stdio.h>
@@ -56,4 +59,7 @@
 /** \name Library Initializer */ ///@{
 void USART_BC_init(void);
 ///@}
+
+#endif /* end of include guard: _USART_BC_H_ */
+
 /** @} */ /* end of \defgoup usart_bc_api */

@@ -24,9 +24,22 @@
 
 #include "usart_bc.h"
 
+/* Macro Definitions **********************************************************/
+
+#define USART_BC_MODULE USARTC0 ///< USART module connected to Board Controller
+
+#define USART_BC_PORT       PORTC   ///< USART PORT wired to Board Controller
+#define USART_BC_TXD_PIN_bm PIN3_bm ///< TxD pin bitmask
+
+#define USART_BC_BSEL_9600   ((uint16_t)12) ///< BSEL for 9600 baud rate
+#define USART_BC_BSCALE_9600 ((uint8_t)4)   ///< BSCALE for 9600 baud rate
+
+#define USART_BC_ONE_STOP_BIT false ///< last parameter to USART_Format_Set()
+
+
 /* Internal Function Prototypes ***********************************************/
 
-void redirect_stdout_to_BC(void);
+static void redirect_stdout_to_BC(void);
 static int USART_BC_putchar(char c, FILE *stream);
 
 /* Global Variables ***********************************************************/
@@ -94,7 +107,7 @@ void USART_BC_init(void) {
  * characters to the UART channel connected to the Board Controller. This is
  * the function which allows subsequent printf() calls to be sent and
  * understood by the Board Controller for translation onto the USB line. */
-void redirect_stdout_to_BC(void) {
+static void redirect_stdout_to_BC(void) {
    stdout = &USART_BC_stdout;
 }
 

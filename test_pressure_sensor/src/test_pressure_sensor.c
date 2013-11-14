@@ -1,4 +1,4 @@
-/** \file test_pressure_sensor.c
+/** \file test_linear_actuator.c
  *
  * \brief System software for testing the pressure sensor and finding the
  * threshold values.
@@ -50,18 +50,8 @@
 
 /* Include Directives *********************************************************/
 
-#include "test_pressure_sensor.h"
+#include "test_linear_actuator.h"
 
-/* Global Variables ***********************************************************/
-/** \brief ADC0 connected to MPx0*/
-ADC_ext_t adc0;
-
-/** \brief ADC1 connected to MPx1*/
-ADC_ext_t adc1;
-
-/** \brief the ADC which is currently undergoing an SPI transfer to receive the
- * conversion result */
-volatile ADC_sel_t current_ADC;
 
 /* Function Definitions *******************************************************/
 
@@ -124,20 +114,14 @@ void setup_switches(uint8_t switch_mask) {
    SWITCH_PORTL.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;
 }
 
-/** \brief Sets up the ADC.
+/** \brief Initializes the pressure sensor library.
  *
- * The values used to set up the ADC are set in test_ext_boards.h as macro
- * defined variables.
+ * This allows for easy interfacing with the sensor through the PS_* library
+ * calls.
  *
- * \note The adc being initialized is a global variable, as this must be
- * accessed from the ISRs set up to coordinate the communication with the ADC,
- * as documented in the adc library.
- * \sa adc.h */
-void setup_ADC() {
-   ADC_init(&adc0, &ADC0_CTRL_PORT, ADC0_CONVST_bm, ADC0_EOC_bm,
-            &SPI_PORT, &SPI_MODULE, SPI_SS0_bm);
-   ADC_init(&adc1, &ADC1_CTRL_PORT, ADC1_CONVST_bm, ADC1_EOC_bm,
-            &SPI_PORT, &SPI_MODULE, SPI_SS1_bm);
+ * \param[in] pressure_sensor The pressure sensor to initialize */
+void setup_pressure_sensor(PS_t *pressure_sensor) {
+   PS_init(pressure_sensor);
 }
 
 /** \brief Sets up the USART connection with the Board Controller.
@@ -154,134 +138,24 @@ void setup_USART_BC(void) {
    USART_BC_init();
 }
 
-/** \brief Scans all 672 pressure sensor elements, and saves the result in the
- * given buffer.
- *
- * Scanning is performed by synchronizing the order of ADC conversions to
- * adjust the sensor element being scanned appropriately (to change MPy
- * channel, read from ADC1, and MPx channel is updated when reading from ADC0.
- * This is because both ADCs and both MPs are on the same SPI bus, but SS0
- * controls ADC0 and MPx, and SS1 controls ADC1 and MPy). The conversion result
- * is saved in the given buffer.
- *
- * \note The memory for the buffer is assumed to have been allocated
- * appropriately.
- *
- * \note The conversion results saved in the given buffer are right adjusted,
- * 12-bit integers, which are not sign extended (MSB->LSB = 4x leading 0's,
- * sign bit, then the 11 bit conversion result)
- *
- * \param[out] readings Buffer to save the sensor readings in */
-void scan_all(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
-   uint8_t y_channel, x_channel;
-
-   /* show that a reading is taking place */
-   LED_PORT.OUT = 0xff;
-
-   /* start at position 0,0 */
-   ADC_set_output_data(&adc0, MPx_channels+0);
-   ADC_sample_once(&adc0);
-   ADC_set_output_data(&adc1, MPy_channels+0);
-   ADC_sample_once(&adc1);
-
-   for (y_channel = 0; y_channel < NUM_MPY_CHANS; ++y_channel) {
-
-      /* set the y channel, but don't use the conversion result */
-      ADC_set_output_data(&adc1, MPy_channels+y_channel);
-      ADC_sample_once(&adc1);
-      for (x_channel = 0; x_channel < (NUM_MPX_CHANS / 2); ++x_channel) {
-
-         /* stay on the same y channel */
-         ADC_set_output_data(&adc1, MPy_channels+y_channel);
-         readings[y_channel][x_channel + (NUM_MPX_CHANS/2)] =
-            ADC_sample_once(&adc1);
-
-         if (x_channel == (NUM_MPX_CHANS / 2) - 1) { /* set channel back to
-                                                        0 */
-            ADC_set_output_data(&adc0, MPx_channels+0);
-         }
-         else { /* increase to the next mpx channel */
-            ADC_set_output_data(&adc0, MPx_channels+x_channel+1);
-         }
-         readings[y_channel][x_channel] = ADC_sample_once(&adc0);
-      }
-   }
-
-   /* finished with reading */
-   LED_PORT.OUT = 0x00;
-   return;
-}
-
-/** \brief Prints the results of a full sensor conversion scan.
- *
- * This function handles subtracting the compensation readings from the actual
- * sensor readings, and prints the results to a terminal window using the
- * USART-USB gateway on the development board. Additionally, the order in which
- * the elements are printed are manipulated in order to align the position of
- * the reading displayed with where the reading physically took place on the
- * sensor (x,y position of the printed result matches the x,y position on the
- *         sensor) to facilitate debugging and correct sensor operation.
- *
- * \param[in] readings Full sensor scan readings result buffer
- * \param[in] compensations Compensation values buffer */
-void print_results(uint16_t readings[NUM_MPY_CHANS][NUM_MPX_CHANS],
-                   uint16_t compensations[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
-   int8_t y_channel, x_channel;
-   uint16_t reading, compensation, diff;
-
-   for (y_channel = 0; y_channel < NUM_MPY_CHANS; ++y_channel) {
-      printf("\n");
-      for (x_channel = NUM_MPX_CHANS - 1; x_channel >= 0 ; --x_channel) {
-         reading = readings[y_channel][x_channel];
-         compensation = compensations[y_channel][x_channel];
-
-         if (reading < compensation) {
-            diff = 0;
-         }
-         else {
-            diff = reading-compensation;
-         }
-         printf("%3u ", diff); /* diff is 11 bits, so value is 0-1024 */
-      }
-   }
-}
-
-/** \brief Prints the contents of the given buffer.
- *
- * This function aids in debugging the application so the user can observe the
- * direct contents of the given buffer.
- *
- * \param[in] buffer The pressure sensor scan buffer to print out */
-void print_buffer(uint16_t buffer[NUM_MPY_CHANS][NUM_MPX_CHANS]) {
-   int8_t y_channel, x_channel;
-
-   for (y_channel = 0; y_channel < NUM_MPY_CHANS; ++y_channel) {
-      printf("\n");
-      for (x_channel = NUM_MPX_CHANS - 1; x_channel >= 0 ; --x_channel) {
-         printf("%3u ", buffer[y_channel][x_channel] / 2);
-      }
-   }
-}
-
 /** \brief main loop to run tests.
  *
  * The tests being run are described in the documentation of this file.
  *
  * \return never returns, test loop runs ad infinitum. */
 int main(void) {
-   uint8_t switch_mask = PIN4_bm | PIN5_bm;
+   uint8_t switch_mask = COMPENSATION_SWITCH_bm | SCAN_SWITCH_bm;
    bool compensation_switch_pushed = false;
    bool scan_switch_pushed = false;
 
-   uint16_t compensation_buffer[NUM_MPY_CHANS][NUM_MPX_CHANS];
-   uint16_t scan_buffer[NUM_MPY_CHANS][NUM_MPX_CHANS];
+   PS_t pressure_sensor;
 
    /* call all of the setup_* functions */
    cli();
    setup_clocks();
    setup_LEDs();
    setup_switches(switch_mask);
-   setup_ADC();
+   setup_pressure_sensor(&pressure_sensor);
    setup_USART_BC();
    sei();
 
@@ -302,8 +176,10 @@ int main(void) {
           && !compensation_switch_pushed) {
          compensation_switch_pushed = true;
 
-         scan_all(compensation_buffer);
-         print_buffer(compensation_buffer);
+         LED_PORT.OUT = 0xff;
+         PS_calibrate(&pressure_sensor);
+         LED_PORT.OUT = 0x00;
+         PS_print_compensation_buffer(&pressure_sensor);
       }
       else if (!(SWITCH_PORTL.IN & COMPENSATION_SWITCH_bm)) {
          compensation_switch_pushed = false;
@@ -313,45 +189,13 @@ int main(void) {
           && !scan_switch_pushed) {
          scan_switch_pushed = true;
 
-         scan_all(scan_buffer);
-         print_results(scan_buffer, compensation_buffer);
+         LED_PORT.OUT = 0xff;
+         PS_scan_all(&pressure_sensor);
+         LED_PORT.OUT = 0x00;
+         PS_print_scan_buffer(&pressure_sensor);
       }
       else if (!(SWITCH_PORTL.IN & SCAN_SWITCH_bm)) {
          scan_switch_pushed = false;
       }
-   }
-}
-
-/** \brief ADC /EOC interrupt vector (PORT.INT0)
- *
- * This interrupt source was configured in the call to ADC_init(), but must be
- * registered by the user to allow for multiple ADCs to be used in the
- * system.  */
-ISR(ADC0_EOC_INT_VECT) {
-   current_ADC = ADC0;
-   ADC_EOC_interrupt_handler(&adc0);
-}
-
-/** \brief ADC /EOC interrupt vector (PORT.INT0)
- *
- * This interrupt source was configured in the call to ADC_init(), but must be
- * registered by the user to allow for multiple ADCs to be used in the
- * system.  */
-ISR(ADC1_EOC_INT_VECT) {
-   current_ADC = ADC1;
-   ADC_EOC_interrupt_handler(&adc1);
-}
-
-/** \brief ADC SPI interrupt
- *
- * This interrupt source was configured in the call to ADC_init(), but must be
- * registered by the user to allow for multiple ADCs to be used in the
- * system. */
-ISR(SPI_INT_VECT) {
-   if (current_ADC == ADC0) {
-      ADC_SPI_interrupt_handler(&adc0);
-   }
-   else {
-      ADC_SPI_interrupt_handler(&adc1);
    }
 }

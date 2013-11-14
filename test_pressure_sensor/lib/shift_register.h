@@ -31,6 +31,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.\endverbatim */
 
+#ifndef _SHIFT_REGISTER_H_
+#define _SHIFT_REGISTER_H_
+
 /* Include Directives *********************************************************/
 #include "spi_driver.h"
 
@@ -53,4 +56,6 @@ void SR_init(SR_t *shift_reg, PORT_t *port, SPI_t *module, bool lsb_first);
 ///@}
 
 void SR_send_byte(SR_t *shift_reg, uint8_t byte);
+
+#endif /* end of include guard: _SHIFT_REGISTER_H_ */
 /** @} */ /* end of \defgoup shift_register_api */
