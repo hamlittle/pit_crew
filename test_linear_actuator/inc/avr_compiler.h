@@ -55,7 +55,7 @@
 
 #ifndef F_CPU
 /*! \brief Define default CPU frequency, if this is not already defined. */
-#define F_CPU 2000000UL
+#define F_CPU 32000000UL /* 32 MHz */
 #endif
 
 #if defined( __GNUC__ )

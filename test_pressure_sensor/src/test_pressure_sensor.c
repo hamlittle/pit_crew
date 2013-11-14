@@ -1,4 +1,4 @@
-/** \file test_linear_actuator.c
+/** \file test_pressure_sensor.c
  *
  * \brief System software for testing the pressure sensor and finding the
  * threshold values.
@@ -50,7 +50,7 @@
 
 /* Include Directives *********************************************************/
 
-#include "test_linear_actuator.h"
+#include "test_pressure_sensor.h"
 
 
 /* Function Definitions *******************************************************/

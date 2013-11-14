@@ -1,7 +1,6 @@
 /** \file test_linear_actuator.h
  *
- * \brief System software for testing the pressure sensor and finding the
- * threshold values.
+ * \brief System software for testing the linear actuators.
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com

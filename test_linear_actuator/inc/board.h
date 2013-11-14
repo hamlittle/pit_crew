@@ -9,7 +9,6 @@
 #ifndef __XMEGA_A1_XPLAINED__
 #define __XMEGA_A1_XPLAINED__
 
-
 #define LED_PORT PORTE ///< LEDs are wired to PORTE[0..7]
 
 #define SWITCH_PORTL         PORTD      ///< Switch Port [0..5]

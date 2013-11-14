@@ -1,32 +1,13 @@
 /** \file test_linear_actuator.c
  *
- * \brief System software for testing the pressure sensor and finding the
- * threshold values.
+ * \brief System software for testing the linear actuators.
  *
- * Pressing switch 4 scans every channel and sets the compensation values. This
- * compensates for the fact that in the home position, some of the needles will
- * be applying a pressure to the sensor. This compensation value is subtracted
- * from the appropriate ADC readings before any analysis on them is performed.
+ * This test follows directly from AVR446: Linear Speed Control of Stepper
+ * Motors. This test is simply a port of the code provided with this App Note to
+ * the Xmega Platform. On startup, a help menu is presented which explains how
+ * to run the tests.
  *
- * Pressing switch 5 initiates a scan of all the needles, and prints out the
- * most useful information about them. The printed information can be captured
- * using a terminal window set to read from the USB port the development board
- * is hooked up to. The information printed is:
- *    - Number of sensors showing a reading
- *    - Highest reading (range 0-2048)
- *    - Lowest reading (range 0-2048)
- *    - Average reading (range 0-2048)
- *
- * \note In order to change the channel on MPy (the second board), ADC0 must be
- * read first, so that when reading from ADC1, SR1 is updated. If we read from
- * ADC1 first, it would change the channel on MPy before ADC0 could get
- * a reading. The vice versa is also true: when we want to change the MPx
- * channel selected, we must read from ADC1 first, then ADC0, because the SPI
- * transfer during which we are updating SR0 occurs when we read ADC0.
- *
- * \note PD[1,3] are being used by ADC0, so these switches are not available to
- * be used on the development board. However, any of the other switches are fair
- * game.
+ * \todo TODO test_linear_actuator.c documentation
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
