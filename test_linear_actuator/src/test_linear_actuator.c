@@ -131,6 +131,9 @@ int main(void) {
 
    PS_t pressure_sensor;
 
+   char buffer[USART_RX_BUFFER_SIZE];
+   uint8_t output;
+
    /* call all of the setup_* functions */
    cli();
    setup_clocks();
@@ -139,6 +142,14 @@ int main(void) {
    setup_pressure_sensor(&pressure_sensor);
    setup_USART_BC();
    sei();
+
+   while (1) {
+      if (USART_BC_RX_available() && USART_BC_get_string(buffer)) {
+         output = atoi(buffer);
+         LED_PORT.OUT = output;
+         printf("LEDS set to %d\n", output);
+      }
+   }
 
    /* signal debugging */
    PORTC.DIRCLR = PIN6_bm;

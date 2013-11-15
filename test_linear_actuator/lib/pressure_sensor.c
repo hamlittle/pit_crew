@@ -142,13 +142,7 @@ void PS_init(PS_t *pressure_sensor) {
             &SPI_PORT, &SPI_MODULE, SPI_SS1_bm);
 }
 
-/** \brief Performs sensor calibration, and saves the result internally
- *
- * Scanning is performed by synchronizing the order of ADC conversions to
- * adjust the sensor element being scanned appropriately (to change MPy
- * channel, read from ADC1, and MPx channel is updated when reading from ADC0.
- * This is because both ADCs and both MPs are on the same SPI bus, but SS0
- * controls ADC0 and MPx, and SS1 controls ADC1 and MPy).
+/** \brief Calibrates the pressure sensor for future scans.
  *
  * The compensation values generated are saved internally in the given
  * pressure_sensor parameter, and used in future PS_scan_all() calls. To get
@@ -156,6 +150,12 @@ void PS_init(PS_t *pressure_sensor) {
  *
  * To see the results of the compensation buffer, use the
  * PS_get_compensation_buffer() macro.
+ *
+ * \note Scanning is performed by synchronizing the order of ADC conversions to
+ * adjust the sensor element being scanned appropriately (to change MPy
+ * channel, read from ADC1, and MPx channel is updated when reading from ADC0.
+ * This is because both ADCs and both MPs are on the same SPI bus, but SS0
+ * controls ADC0 and MPx, and SS1 controls ADC1 and MPy).
  *
  * \note This function is blocking while the calibration is being performed, and
  * should not be called during a time critical routine, as this function samples
@@ -168,18 +168,19 @@ void PS_calibrate(PS_t *pressure_sensor) {
 
 /** \brief brief description
  *
- * Scanning is performed by synchronizing the order of ADC conversions to
+ * The conversion result is saved internally in the pressure_sensor parameter,
+ * and adjusted according to the last calibration performed on the pressure
+ * sensor. To get access to the results, use PS_get_scan_buffer()
+ *
+ * \note Scanning is performed by synchronizing the order of ADC conversions to
  * adjust the sensor element being scanned appropriately (to change MPy
  * channel, read from ADC1, and MPx channel is updated when reading from ADC0.
  * This is because both ADCs and both MPs are on the same SPI bus, but SS0
  * controls ADC0 and MPx, and SS1 controls ADC1 and MPy).
  *
- * The conversion result is saved internally in the pressure_sensor parameter.
- * To get access to the results, use PS_get_scan_buffer()
- *
  * \note This function is blocking while the scan is being performed, and should
- * not be called durin a time critical routine, as this function samples all 672
- * pressure sensor elements.
+ * not be called during a time critical routine, as this function samples all
+ * 672 pressure sensor elements.
  *
  * \param[in] pressure_sensor pressure sensor to scan and compensate */
 void PS_scan_all(PS_t *pressure_sensor) {

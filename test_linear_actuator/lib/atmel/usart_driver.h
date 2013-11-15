@@ -64,9 +64,9 @@
 /*! USART buffer defines. */
 
 /*! \brief  Receive buffer size: 2,4,8,16,32,64,128 or 256 bytes. */
-#define USART_RX_BUFFER_SIZE 4
+#define USART_RX_BUFFER_SIZE 256
 /*! \brief Transmit buffer size: 2,4,8,16,32,64,128 or 256 bytes */
-#define USART_TX_BUFFER_SIZE 4
+#define USART_TX_BUFFER_SIZE 256
 /*! \brief Receive buffer mask. */
 #define USART_RX_BUFFER_MASK ( USART_RX_BUFFER_SIZE - 1 )
 /*! \brief Transmit buffer mask. */
@@ -298,7 +298,7 @@ bool USART_TXBuffer_FreeSpace(USART_data_t * usart_data);
 bool USART_TXBuffer_PutByte(USART_data_t * usart_data, uint8_t data);
 bool USART_RXBufferData_Available(USART_data_t * usart_data);
 uint8_t USART_RXBuffer_GetByte(USART_data_t * usart_data);
-bool USART_RXComplete(USART_data_t * usart_data);
+char USART_RXComplete(USART_data_t * usart_data);
 void USART_DataRegEmpty(USART_data_t * usart_data);
 ///@}
 

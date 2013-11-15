@@ -18,6 +18,7 @@
  *    - 4 leading 0's
  *    - 1 sign bit
  *    - 11 bit conversion value (range: 0-2048)
+ *
  * Additionally, the format of the each buffer (compensation and full sweep
  * scan)
  * are as defined as:
@@ -93,7 +94,8 @@ typedef struct pressure_sensor_struct  {
    uint16_t scan_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS];
 } PS_t;
 
-/* Macro Defined Functions ****************************************************/
+/** \name Macro Defined Functions *********************************************/
+///@{
 
 /** \brief Returns the scan buffer from the last scan performed.
  *
@@ -113,6 +115,8 @@ typedef struct pressure_sensor_struct  {
  * \param[in] _ps The pressure sensor to get compensation buffer from
  * \return the compensation buffer from the last sensor calibration */
 #define PS_get_compensation_buffer(_ps) ((_ps)->compensation_buffer)
+
+///@}
 
 /* Function Prototypes ********************************************************/
 

@@ -13,6 +13,13 @@
  * connection. This allows for any machine connected to the usb port to monitor
  * the communications being sent, either by a terminal program or otherwise.
  *
+ * For reception, use the USART_BC_RX_available() function to check for received
+ * data, and the USART_BC_get_string() function to return the last string
+ * received, NULL terminated. Note that when sending data to the board
+ * controller from a host connected on the USB line, the data sent must be
+ * terminated by a Line Feed (\n, ASCII 0x0A), or this library may hang
+ * indefinately when returning the last string received.
+ *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
  *         Cal Poly ME UGRD class of 2014
@@ -41,11 +48,20 @@
 #include <stdio.h>
 #include "usart_driver.h"
 
+/* Macro Definitions **********************************************************/
+
+/** \brief The null terminator for C strings */
+#define NUL 0x00
+
 /* Function Prototypes ********************************************************/
 
 /** \name Library Initializer */ ///@{
 void USART_BC_init(void);
 ///@}
+
+bool USART_BC_RX_available(void);
+void USART_BC_flush_RX_buffer(void);
+bool USART_BC_get_string(char* buffer);
 
 #endif /* end of include guard: _USART_BC_H_ */
 

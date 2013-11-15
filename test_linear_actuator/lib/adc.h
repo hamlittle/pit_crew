@@ -3,11 +3,11 @@
  *
  * \brief Enables interfacing with the ADC, in continuous and single sampling
  * modes.
- * * This library simplifies interfacing with the AD7892ANZ1 Analog to Digital
- * * Converter (ADC). ADC_init initializes the library, after which the ADC can
- * be
- * run in continuous or single sampling modes. This library depends on two ISR's
- * which must be registered by the user, explained in the note below.
+ *
+ * This library simplifies interfacing with the AD7892ANZ1 Analog to Digital
+ * Converter (ADC). ADC_init initializes the library, after which the ADC can
+ * be run in continuous or single sampling modes. This library depends on two
+ * ISR's which must be registered by the user, explained in the note below.
  *
  * \note This library relies on two ISR's which must be set up by the user: one
  * for the end of conversion (/EOC) pin on the ADC, and the second for the SPI

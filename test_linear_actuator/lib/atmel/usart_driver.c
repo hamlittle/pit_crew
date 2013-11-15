@@ -119,8 +119,8 @@ void USART_InterruptDriver_DreInterruptLevel_Set(USART_data_t * usart_data,
  *
  *  \param usart_data The USART_data_t struct instance.
  *
- *  \retval true      There is data in the receive buffer.
- *  \retval false     The receive buffer is empty.
+ *  \retval true      There is data in the transmit buffer.
+ *  \retval false     The transmit buffer is empty.
  */
 bool USART_TXBuffer_FreeSpace(USART_data_t * usart_data)
 {
@@ -222,7 +222,6 @@ uint8_t USART_RXBuffer_GetByte(USART_data_t * usart_data)
 }
 
 
-
 /*! \brief RX Complete Interrupt Service Routine.
  *
  *  RX Complete Interrupt Service Routine.
@@ -230,12 +229,11 @@ uint8_t USART_RXBuffer_GetByte(USART_data_t * usart_data)
  *
  *  \param usart_data      The USART_data_t struct instance.
  *
- *  \return true if usart reception is complete.
+ *  \return the latest character received
  */
-bool USART_RXComplete(USART_data_t * usart_data)
+char USART_RXComplete(USART_data_t * usart_data)
 {
    USART_Buffer_t * bufPtr;
-   bool ans;
 
    bufPtr = &usart_data->buffer;
    /* Advance buffer head. */
@@ -245,14 +243,15 @@ bool USART_RXComplete(USART_data_t * usart_data)
    uint8_t tempRX_Tail = bufPtr->RX_Tail;
    uint8_t data = usart_data->usart->DATA;
 
-   if (tempRX_Head == tempRX_Tail) {
-      ans = false;
-   }else{
-      ans = true;
+   if (tempRX_Head != tempRX_Tail) {
       usart_data->buffer.RX[usart_data->buffer.RX_Head] = data;
       usart_data->buffer.RX_Head = tempRX_Head;
    }
-   return ans;
+   else {
+      data = 0;
+   }
+
+   return data;
 }
 
 
