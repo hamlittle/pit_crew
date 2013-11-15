@@ -32,6 +32,7 @@
 #include "clksys_driver.h"
 #include "pressure_sensor.h"
 #include "usart_bc.h"
+#include "linear_actuator.h"
 
 /* Macro Definitions **********************************************************/
 
@@ -49,6 +50,7 @@ void setup_LEDs(void);
 void setup_switches(uint8_t switch_mask);
 void setup_pressure_sensor(PS_t *pressure_sensor);
 void setup_USART_BC(void);
+void setup_linear_actuator(LA_t *actuator);
 ///@}
 
 #endif /* end of include guard: _TEST_LINEAR_ACTUATOR_H_ */
