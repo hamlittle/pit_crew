@@ -1,5 +1,5 @@
 /** \defgroup SM_API Stepper Motor Library API */ /** @{ */
-/** \file steper_motor.h
+/** \file stepper_motor.h
  *
  * \brief Enables interfacing with the GECKO G213V stepper motor driver.
  *
@@ -14,6 +14,19 @@
  * If the direction of the motor is the opposite of what is required for the
  * system, simply switch the A lead with the B lead, and the /A lead with the /B
  * lead on the motor port of the driver.
+ *
+ * The library is initialized through a call to SM_init(), which handles setting
+ * up a port to communicate with the stepper motor driver, as well as the timer
+ * interrupt used by this library to control the step pulses. Upon
+ * initialization, the motor is disabled by pulling the /DISABLE pin low. In
+ * order to move the motor, use the function SM_enable().
+ *
+ * A stepper motor movement is initiated by a call to SM_move(). An initial
+ * calculation is made to determine the speed profile of the move before it is
+ * executed. Once this set up has been performed, the timer for the motor is
+ * started, and the move is carried out by the ISR which is vectored on the
+ * timer's overflow, and the step pulse period is therefore determined by the
+ * timer's period.
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -52,7 +65,18 @@
 
 #define T1_FREQ 4000000 ///< Motor timer frequency, modify as appropriate
 
-#define SPR 200 ///< Steps per full revolution
+#define SPR 400 ///< Steps per full revolution
+
+/** \name Maths Constants */
+///@{
+
+#define ALPHA (2*3.14159/SPR)                    // 2*pi/spr
+#define A_T_x100 ((long)(ALPHA*T1_FREQ*100))     // (ALPHA / T1_FREQ)*100
+#define T1_FREQ_148 ((int)((T1_FREQ*676)/1000)) // div by 100, scale by 0.676
+#define A_SQ (long)(ALPHA*2*10000000000)         // ALPHA*2*10000000000
+#define A_x20000 (int)(ALPHA*20000)              // ALPHA*20000
+
+///@}
 
 /* Typedefs, Enums, and Structs ***********************************************/
 
@@ -106,26 +130,10 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
 
 void SM_move(SM_t *motor,
              int16_t step, uint16_t accel, uint16_t decel, uint16_t speed);
+void SM_enable(SM_t *motor);
+void SM_disable(SM_t *motor);
+void SM_brake(SM_t *motor);
 
 
 #endif /* end of include guard: _STEPPER_MOTOR_H_ */
 /** @} */ /* End of \defgroup SM_API */
-
-
-
-
-// Maths constants. To simplify maths when calculating in speed_cntr_Move().
-#define ALPHA (2*3.14159/SPR)                    // 2*pi/spr
-#define A_T_x100 ((long)(ALPHA*T1_FREQ*100))     // (ALPHA / T1_FREQ)*100
-#define T1_FREQ_148 ((int)((T1_FREQ*0.676)/100)) // div by 100, scale by 0.676
-#define A_SQ (long)(ALPHA*2*10000000000)         // ALPHA*2*10000000000
-#define A_x20000 (int)(ALPHA*20000)              // ALPHA*20000
-
-/* void LA_move(int16_t steps, uint16_t accel, uint16_t decel, uint16_t
- * max_speed); */
-/* void speed_cntr_Init_Timer1(void); */
-/* unsigned long sqrt_Taylor(unsigned long v); */
-/* unsigned int min(unsigned int x, unsigned int y); */
-
-//! Global status flags
-extern struct GLOBAL_FLAGS status;

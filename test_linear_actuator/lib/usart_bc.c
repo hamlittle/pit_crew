@@ -186,8 +186,7 @@ bool USART_BC_get_string(char* buffer) {
       *(buffer+(counter++)) = next_char;
    }
 
-   /* if only LF received, counter will be 1 */
-   if (counter < 2 || next_char != LF) {
+   if (counter == 0 || next_char != LF) {
       return false;
    }
 

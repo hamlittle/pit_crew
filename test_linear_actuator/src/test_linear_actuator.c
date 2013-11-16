@@ -33,6 +33,10 @@
 
 #include "test_linear_actuator.h"
 
+/* Global Data ****************************************************************/
+
+/* \brief The motor we are controlling */
+SM_t motor;
 
 /* Function Definitions *******************************************************/
 
@@ -41,7 +45,7 @@
  * CPU clock frequencies set are:
  * -CPU: 32HMZ
  * -Peripheral Prescaling: NONE */
-void setup_clocks(void) {
+static void setup_clocks(void) {
 
    // set 32MHZ oscillator as CPU clock source
    CLKSYS_Enable(OSC_RC32MEN_bm);                          // enable
@@ -68,7 +72,7 @@ void setup_clocks(void) {
  * Sets the pins on LED_PORT to inverted output, so setting the corresponding
  * pin will turn on the LED. Clear the corresponding pin to turn the given LED
  * off. */
-void setup_LEDs(void) {
+static void setup_LEDs(void) {
    LED_PORT.DIR = 0xff;                 // set all pins of port E to output
    PORTCFG.MPCMASK = 0xff;             // set for all pins on port E...
    LED_PORT.PIN0CTRL |= PORT_INVEN_bm;  // inverted output (set hi turns on led)
@@ -82,7 +86,7 @@ void setup_LEDs(void) {
  * pushed.
  *
  * \param[in] switch_mask which switches to enable. */
-void setup_switches(uint8_t switch_mask) {
+static void setup_switches(uint8_t switch_mask) {
    uint8_t maskL = switch_mask & SWITCH_PORTL_MASK_gm;
    uint8_t maskH = switch_mask >> SWITCH_PORTH_OFFSET;
 
@@ -92,18 +96,17 @@ void setup_switches(uint8_t switch_mask) {
 
    SWITCH_PORTH.DIR &= ~maskH;
    PORTCFG.MPCMASK = maskH;
-   SWITCH_PORTL.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;
-}
+   SWITCH_PORTH.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;}
 
-/** \brief Initializes the pressure sensor library.
- *
- * This allows for easy interfacing with the sensor through the PS_* library
- * calls.
- *
- * \param[in] pressure_sensor The pressure sensor to initialize */
-void setup_pressure_sensor(PS_t *pressure_sensor) {
-   PS_init(pressure_sensor);
-}
+   /** \brief Initializes the pressure sensor library.
+    *
+    * This allows for easy interfacing with the sensor through the PS_* library
+    * calls.
+    *
+    * \param[in] pressure_sensor The pressure sensor to initialize */
+   static void setup_pressure_sensor(PS_t *pressure_sensor) {
+      PS_init(pressure_sensor);
+   }
 
 /** \brief Sets up the USART connection with the Board Controller.
  *
@@ -115,8 +118,15 @@ void setup_pressure_sensor(PS_t *pressure_sensor) {
  * transmissions using a Serial Port terminal program, such as RealTerm.
  *
  * This set up is performed by the usart_bc.h library */
-void setup_USART_BC(void) {
+static void setup_USART_BC(void) {
    USART_BC_init();
+}
+
+/// \todo TODO document setup_motor()
+static void setup_motor() {
+   SM_init(&motor, &SM_port, SM_DISABLE_bm, SM_DIRECTION_bm, SM_STEP_bm,
+           SM_TIMER);
+   SM_enable(&motor);
 }
 
 /** \brief main loop to run tests.
@@ -125,14 +135,18 @@ void setup_USART_BC(void) {
  *
  * \return never returns, test loop runs ad infinitum. */
 int main(void) {
-   uint8_t switch_mask = COMPENSATION_SWITCH_bm | SCAN_SWITCH_bm;
-   bool compensation_switch_pushed = false;
-   bool scan_switch_pushed = false;
+   uint8_t switch_mask = PIN6_bm;
+
+   int16_t position = 0;
+   int16_t steps = 1000;
+   uint16_t acceleration = 100;
+   uint16_t deceleration = 100;
+   uint16_t speed = 800;
 
    PS_t pressure_sensor;
 
-   char buffer[USART_RX_BUFFER_SIZE];
-   uint8_t output;
+   bool cmd_ok = false;
+   char command_buffer[USART_RX_BUFFER_SIZE];
 
    /* call all of the setup_* functions */
    cli();
@@ -141,53 +155,143 @@ int main(void) {
    setup_switches(switch_mask);
    setup_pressure_sensor(&pressure_sensor);
    setup_USART_BC();
+   setup_motor();
    sei();
 
-   while (1) {
-      if (USART_BC_RX_available() && USART_BC_get_string(buffer)) {
-         output = atoi(buffer);
-         LED_PORT.OUT = output;
-         printf("LEDS set to %d\n", output);
-      }
-   }
+   /* shows the help menu */
+   show_help_message();
 
-   /* signal debugging */
-   PORTC.DIRCLR = PIN6_bm;
-   PORTC.PIN6CTRL = PORT_OPC_PULLDOWN_gc;
+   /* show the current state of the linear actuator */
+   show_motor_data(position, acceleration, deceleration, speed, steps);
 
    while (1) {
+      cmd_ok = false;
+      // If a command is received, check the command and act on it.
+      if (USART_BC_get_string(command_buffer)) {
+         if (command_buffer[0] == 'm') {
+            // Move with...
+            if (command_buffer[1] == ' '){
+               // ...number of steps given.
+               steps = atoi((const char *)command_buffer+2);
+               SM_move(&motor, steps, acceleration, deceleration, speed);
+               position += steps;
+               cmd_ok = true;
+               printf("\n\r  ");
+            }
+            else if (command_buffer[1] == 'o'){
+               if (command_buffer[2] == 'v'){
+                  if (command_buffer[3] == 'e'){
+                     // ...all parameters given
+                     if (command_buffer[4] == ' '){
+                        int i = 6;
+                        steps = atoi((const char *)command_buffer+5);
+                        while ((command_buffer[i]!=' ') &&
+                               (command_buffer[i]!='\n')) {
+                           i++;
+                        }
+                        i++;
+                        acceleration = atoi((const char *)command_buffer+i);
+                        while ((command_buffer[i]!=' ') &&
+                               (command_buffer[i]!='\n')) {
+                           i++;
+                        }
+                        i++;
+                        deceleration = atoi((const char *)command_buffer+i);
+                        while ((command_buffer[i]!=' ') &&
+                               (command_buffer[i]!='\n')) {
+                           i++;
+                        }
+                        i++;
+                        speed = atoi((const char *)command_buffer+i);
+                        SM_move(&motor, steps, acceleration,
+                                deceleration, speed);
+                        position += steps;
+                        cmd_ok = true;
+                        printf("\n\r  ");
+                     }
+                  }
+               }
+            }
+         }
+         else if (command_buffer[0] == 'a'){
+            // Set acceleration.
+            if (command_buffer[1] == ' '){
+               acceleration = atoi((const char *)command_buffer+2);
+               cmd_ok = true;
+            }
+         }
+         else if (command_buffer[0] == 'd'){
+            // Set deceleration.
+            if (command_buffer[1] == ' '){
+               deceleration = atoi((const char *)command_buffer+2);
+               cmd_ok = true;
+            }
+         }
+         else if (command_buffer[0] == 's'){
+            if (command_buffer[1] == ' '){
+               speed = atoi((const char *)command_buffer+2);
+               cmd_ok = true;
+            }
+         }
+         else if (command_buffer[0] == '\r'){  // hyper terminal sends \r\n
+            SM_move(&motor, steps, acceleration, deceleration, speed);
+            position += steps;
+            cmd_ok = true;
+         }
+         else if (command_buffer[0] == '?'){
+            show_help_message();
+            cmd_ok = true;
+         }
 
-      if (PORTC.IN & PIN6_bm) {
-         LED_PORT.OUT = 0xff;
-      }
-      else {
-         LED_PORT.OUT = 0x00;
-      }
+         // Send help if invalid command is received.
+         if (!cmd_ok) {
+            show_help_message();
+         }
+         else {
+            while (motor.speed_ramp.run_state != STOP) {
+               if (READ_SWITCHES & PIN6_bm) {
+                  SM_brake(&motor);
+                  printf("Motor parked\n");
+               }
+               printf("Running... Steps Left: %d\n",
+                      steps - motor.speed_ramp.step_count);
+               delay_ms(250);
+            }
 
-      if ((SWITCH_PORTL.IN & COMPENSATION_SWITCH_bm)
-          && !compensation_switch_pushed) {
-         compensation_switch_pushed = true;
+            printf("Done with move\n");
+         }
 
-         LED_PORT.OUT = 0xff;
-         PS_calibrate(&pressure_sensor);
-         LED_PORT.OUT = 0x00;
-         PS_print_compensation_buffer(&pressure_sensor);
-      }
-      else if (!(SWITCH_PORTL.IN & COMPENSATION_SWITCH_bm)) {
-         compensation_switch_pushed = false;
-      }
+         // Clear RXbuffer.
+         USART_BC_flush_RX_buffer();
 
-      if ((SWITCH_PORTL.IN & SCAN_SWITCH_bm)
-          && !scan_switch_pushed) {
-         scan_switch_pushed = true;
+         show_motor_data(position, acceleration, deceleration, speed, steps);
+      }//end if (cmd)
 
-         LED_PORT.OUT = 0xff;
-         PS_scan_all(&pressure_sensor);
-         LED_PORT.OUT = 0x00;
-         PS_print_scan_buffer(&pressure_sensor);
-      }
-      else if (!(SWITCH_PORTL.IN & SCAN_SWITCH_bm)) {
-         scan_switch_pushed = false;
-      }
-   }
+   }//end while (1)
+}
+
+/*! \brief Sends help message.
+ *
+ *  Outputs help message.
+ */
+static void show_help_message(void)
+{
+   printf("%s", help_message);
+}
+
+/*! \brief Sends out data.
+ *
+ *  Outputs the values of the data you can control by serial interface
+ *  and the current position of the stepper motor.
+ *
+ *  \param acceleration Accelration setting.
+ *  \param deceleration Deceleration setting.
+ *  \param speed Speed setting.
+ *  \param steps Position of the stepper motor.
+ */
+static void show_motor_data(int16_t position, uint16_t acceleration,
+                            uint16_t deceleration, uint16_t speed,
+                            int16_t steps) {
+   printf("\n\r Motor pos: %d    a: %d    d: %d    s: %d    m: %d\n\r>",
+          position, acceleration, deceleration, speed, steps);
 }

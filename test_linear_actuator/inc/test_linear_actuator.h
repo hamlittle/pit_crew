@@ -32,12 +32,38 @@
 #include "clksys_driver.h"
 #include "pressure_sensor.h"
 #include "usart_bc.h"
-#include "linear_actuator.h"
+#include "stepper_motor.h"
 
 /* Macro Definitions **********************************************************/
 
-#define COMPENSATION_SWITCH_bm PIN4_bm ///< Start compensation scan switch
-#define SCAN_SWITCH_bm PIN5_bm         ///< Start full sensor scan switch
+#define SM_port PORTC            ///< stepper motor control port
+#define SM_DISABLE_bm PIN0_bm    ///< stepper motor /DISABLE pin
+#define SM_DIRECTION_bm PIN1_bm  ///< stepper motor DIRECTION pin
+#define SM_STEP_bm PIN4_bm       ///< stepper motor STEP pin
+#define SM_TIMER TIMER0          ///< stepper motor timer to use
+
+#define BRAKE_PIN_vect PORTR_INT0_vect ///< Brake pin interrupt vector
+
+/* Static Messages ************************************************************/
+/** \name Help Message */
+///@{
+
+/** \brief Motor interface help message */
+const char *help_message =
+"\n\r--------------------------------------------------------------\n\r"
+"Atmel AVR446 - Linear speed control of stepper motor\n\r\n\r"
+"?  - Show help\n\ra [data] - Set acceleration (range: 71 - 32000)\n\r"
+"d [data] - Set deceleration (range: 71 - 32000)\n\r"
+"s [data] - Set speed (range: 12 - motor limit)\n\r"
+"m [data] - Move [data] steps (range: -64000 - 64000)\n\r"
+"move [steps] [accel] [decel] [speed]\n\r"
+"         - Move with all parameters given\n\r"
+"<enter>  - Repeat last move\n\r\n\r"
+"acc/dec data given in 0.01*rad/sec^2 (100 = 1 rad/sec^2)\n\r"
+"speed data given in 0.01*rad/sec (100 = 1 rad/sec)\n\r"
+"--------------------------------------------------------------\n\r";
+
+///@}
 
 /* Typedefs, Enums, and Structs ***********************************************/
 
@@ -45,13 +71,18 @@
 
 /** \name Board Setup Functions */
 ///@{
-void setup_clocks(void);
-void setup_LEDs(void);
-void setup_switches(uint8_t switch_mask);
-void setup_pressure_sensor(PS_t *pressure_sensor);
-void setup_USART_BC(void);
-void setup_linear_actuator(LA_t *actuator);
+static void setup_clocks(void);
+static void setup_LEDs(void);
+static void setup_switches(uint8_t switch_mask);
+static void setup_pressure_sensor(PS_t *pressure_sensor);
+static void setup_USART_BC(void);
+static void setup_motor(void);
 ///@}
+
+static void show_help_message(void);
+static void show_motor_data(int16_t position, uint16_t acceleration,
+                            uint16_t deceleration, uint16_t speed,
+                            int16_t steps);
 
 #endif /* end of include guard: _TEST_LINEAR_ACTUATOR_H_ */
 

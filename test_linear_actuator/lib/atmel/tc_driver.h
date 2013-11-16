@@ -118,7 +118,8 @@
  *
  *  This macro will restart the timer. The effect of running this command is:
  *    - The CNT[H:L] register is cleared.
- *    - The direction (DIR ) is reset. (Next clock cycle will increase the counter )
+ *    - The direction (DIR ) is reset. (Next clock cycle will increase the 
+ *    counter )
  *    - All compare outputs are set to 0.
  *    - If a DTI module is connected to the timer, it will be reset as well.
  *
@@ -416,8 +417,6 @@ void TC1_SetOverflowIntLevel( volatile TC1_t * tc, TC_OVFINTLVL_t intLevel );
 void TC1_SetErrorIntLevel( volatile TC1_t * tc, TC_ERRINTLVL_t intLevel );
 void TC1_SetCCAIntLevel( volatile TC1_t * tc, TC_CCAINTLVL_t intLevel );
 void TC1_SetCCBIntLevel( volatile TC1_t * tc, TC_CCBINTLVL_t intLevel );
-void TC1_SetCCCIntLevel( volatile TC1_t * tc, TC_CCCINTLVL_t intLevel );
-void TC1_SetCCDIntLevel( volatile TC1_t * tc, TC_CCDINTLVL_t intLevel );
 void TC1_Reset( volatile TC1_t * tc );
 
 
