@@ -7,7 +7,7 @@
  * drivers. These drivers are used ot interface with the linear actuators on the
  * pit crew's machine. The Stepper motor drivers require 3 pins to interface
  * with them
- *    - /DISABLE (pulled low to disable)
+ *    - DISABLE (pulled low to disable)
  *    - DIRECTION Sets the motor's direction
  *    - STEP steps once on rising edge
  *
@@ -17,9 +17,7 @@
  *
  * The library is initialized through a call to SM_init(), which handles setting
  * up a port to communicate with the stepper motor driver, as well as the timer
- * interrupt used by this library to control the step pulses. Upon
- * initialization, the motor is disabled by pulling the /DISABLE pin low. In
- * order to move the motor, use the function SM_enable().
+ * interrupt used by this library to control the step pulses.
  *
  * A stepper motor movement is initiated by a call to SM_move(). An initial
  * calculation is made to determine the speed profile of the move before it is
@@ -27,6 +25,21 @@
  * started, and the move is carried out by the ISR which is vectored on the
  * timer's overflow, and the step pulse period is therefore determined by the
  * timer's period.
+ *
+ * Additionally, There are three states the motor can be put into that are
+ * directly under the user's control. The disabled state turns off all output to
+ * the motor from the motor driver, allowing it to freewheel (this will turn on
+ * the RED eror LED on the driver). This will cancel any ongoing movement.
+ * Disabling the motor is accomplished through the SM_disable() function.
+ * Reenabling the motor is accomplished through a call to SM_enable(). Calling
+ * SM_enable while the motor is enabled has no effect.
+ *
+ * The Park state is similar to the disable state, only it maintains power to
+ * the motor, putting it into its holding torque state. This also cancels any
+ * ongoing movements, and is initiated by a call to SM_brake(). However, this
+ * state does not require a call to SM_enable() in order to start a new
+ * movement; a new movement can be started at any time the motor is in the park
+ * state, and the movement will begin immediately.
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -113,7 +126,7 @@ typedef struct speed_ramp_data{
  * driver */
 typedef struct stepper_motor_driver  {
    PORT_t *port;         ///< Stepper Motor Driver Control Port
-   uint8_t DISABLE_bm;   ///< /DISABLE pin bm
+   uint8_t DISABLE_bm;   ///< DISABLE pin bm
    uint8_t DIRECTION_bm; ///< DIRECTION pin bm
    uint8_t STEP_bm;      ///< STEP pin bm
    SM_SRD_t speed_ramp;  ///< Speed ramp static data struct

@@ -331,24 +331,30 @@ libdoc:
 
 clean:
 	@echo -n Cleaning compiled files and documentation...
-	@rm -f $(LIB_NAME) *.o *.hex *.lst *.elf *~
+	@rm -f $(LIB_NAME) *.o *.hex *.lst *.elf *~ *.swo *.swp
 	@for subdir in $(LIB_DIRS); do \
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \
 		rm -f $$subdir/*~; \
 		rm -f $$subdir/*.d; \
+		rm -f $$subdir/.*.swo; \
+		rm -f $$subdir/.*.swp; \
 		done
 	@for subdir in $(INC_DIR); do \
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \
 		rm -f $$subdir/*~; \
 		rm -f $$subdir/*.d; \
+		rm -f $$subdir/.*.swo; \
+		rm -f $$subdir/.*.swp; \
 		done
 	@for subdir in $(SRC_DIR); do \
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \
 		rm -f $$subdir/*~; \
 		rm -f $$subdir/*.d; \
+		rm -f $$subdir/.*.swo; \
+		rm -f $$subdir/.*.swp; \
 		done
 	@echo done.
 
