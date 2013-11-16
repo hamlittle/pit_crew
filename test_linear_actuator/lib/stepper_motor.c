@@ -277,12 +277,12 @@ static void SM_speed_ramp_init(SM_SRD_t *speed_ramp) {
 static void SM_timer_init(SM_t *motor, SM_timer_t timer) {
    if (timer == TIMER0) {
       TC0_ConfigWGM(&SM_TIMER0, TC_WGMODE_NORMAL_gc);
-      TC0_ConfigClockSource(&SM_TIMER0, TC_CLKSEL_DIV8_gc); /* 32/8 == 4 Mhz */
+      TC0_ConfigClockSource(&SM_TIMER0, TC_CLKSEL_DIV64_gc);/* 32M/64 == 500K */
       motor0 = motor;
    }
    else {
       TC1_ConfigWGM(&SM_TIMER1, TC_WGMODE_NORMAL_gc);
-      TC1_ConfigClockSource(&SM_TIMER1, TC_CLKSEL_DIV8_gc);
+      TC1_ConfigClockSource(&SM_TIMER1, TC_CLKSEL_DIV64_gc);/* 32M/64 == 500K */
       motor1 = motor;
    }
 

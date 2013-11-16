@@ -63,16 +63,16 @@
 #define SM_TIMER0_OVF_vect TCC0_OVF_vect ///< First timer overflow IV
 #define SM_TIMER1_OVF_vect TCC1_OVF_vect ///< Second timer overflow IV
 
-#define T1_FREQ 4000000 ///< Motor timer frequency, modify as appropriate
+#define T1_FREQ 500000 ///< Motor timer frequency, modify as appropriate
 
-#define SPR 400 ///< Steps per full revolution
+#define SPR 200 ///< Steps per full revolution
 
 /** \name Maths Constants */
 ///@{
 
 #define ALPHA (2*3.14159/SPR)                    // 2*pi/spr
 #define A_T_x100 ((long)(ALPHA*T1_FREQ*100))     // (ALPHA / T1_FREQ)*100
-#define T1_FREQ_148 ((int)((T1_FREQ*676)/1000)) // div by 100, scale by 0.676
+#define T1_FREQ_148 ((int)((T1_FREQ*0.676)/100)) // div by 100, scale by 0.676
 #define A_SQ (long)(ALPHA*2*10000000000)         // ALPHA*2*10000000000
 #define A_x20000 (int)(ALPHA*20000)              // ALPHA*20000
 

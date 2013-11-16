@@ -126,7 +126,6 @@ static void setup_USART_BC(void) {
 static void setup_motor() {
    SM_init(&motor, &SM_port, SM_DISABLE_bm, SM_DIRECTION_bm, SM_STEP_bm,
            SM_TIMER);
-   SM_enable(&motor);
 }
 
 /** \brief main loop to run tests.
