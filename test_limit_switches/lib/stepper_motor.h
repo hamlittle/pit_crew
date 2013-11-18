@@ -69,44 +69,92 @@
 #include "tc_driver.h"
 
 /* Macro Defintions ***********************************************************/
+/** \name Limit Switch Definitions */
+///@{
 
-#define SM_TIMER0 TCC0 ///< First timer this library supports
-#define SM_TIMER1 TCC1 ///< Second timer this library supports
+#define LS_PORT PORTC                      ///< Limit Switch port
+#define LS_NEEDLE_PIN_bm PIN0_bm           ///< Needle Limit Switch Pin
+#define LS_RING_PIN_bm   PIN1_bm           ///< Ring Limit Switch Pin
 
-#define SM_TIMER0_OVF_vect TCC0_OVF_vect ///< First timer overflow IV
-#define SM_TIMER1_OVF_vect TCC1_OVF_vect ///< Second timer overflow IV
+///@}
 
-#define T1_FREQ 500000 ///< Motor timer frequency, modify as appropriate
+/** \name Stepper Motor Timer Definitions */
+///@{
 
-#define SPR 200 ///< Steps per full revolution
+#define TIMER_NEEDLE TCC0 ///< Needle Carriage timer
+#define TIMER_RING   TCC1 ///< Retaining Ring timer
+
+#define TIMER_NEEDLE_OVF_vect TCC0_OVF_vect ///< Needle Carriage timer OVF IV
+#define TIMER_RING_OVF_vect   TCC1_OVF_vect ///< Retaining Ring timer OVF IV
+
+#define TIMER_FREQ 125000 ///< Both motors timer's frequency (Hz)
+
+///@}
+
+/** \name Stepper Motor Definitions */
+///@{
+
+#define SPR 200 ///< Motor steps per full revolution
+
+///@}
 
 /** \name Maths Constants */
 ///@{
 
-#define ALPHA (2*3.14159/SPR)                    // 2*pi/spr
-#define A_T_x100 ((long)(ALPHA*T1_FREQ*100))     // (ALPHA / T1_FREQ)*100
-#define T1_FREQ_148 ((int)((T1_FREQ*0.676)/100)) // div by 100, scale by 0.676
-#define A_SQ (long)(ALPHA*2*10000000000)         // ALPHA*2*10000000000
-#define A_x20000 (int)(ALPHA*20000)              // ALPHA*20000
+#define ALPHA (2*3.14159/SPR)                          // 2*pi/spr
+#define A_T_x100 ((long)(ALPHA*TIMER_FREQ*100))     // (ALPHA / T1_FREQ)*100
+#define T1_FREQ_148 ((int)((TIMER_FREQ*0.676)/100)) // scale 0.676, div 100
+#define A_SQ (long)(ALPHA*2*10000000000)               // ALPHA*2*10000000000
+#define A_x20000 (int)(ALPHA*20000)                    // ALPHA*20000
 
 ///@}
 
-/* Typedefs, Enums, and Structs ***********************************************/
+/** \name Macro Defined Functions */
+///@{
+
+/** \brief Returns the state of the motor.
+ *
+ * The four states of the motor are defined in the SM_SRD_state_t enum.
+ * They are:
+ *    - STOP  the motor is parked \sa SM_brake()
+ *    - ACCEL the motor is accelerating to max speed
+ *    - DECEL the motor is decelerating to rest
+ *    - RUN   the motor is running at max speed (b/w ACCEL and DECEL)
+ *
+ * \param[in] motor pointer to the motor to get the state (type SM_t*) */
+#define SM_get_motor_state(_motor) ((_motor)->speed_ramp.run_state)
+
+///@}
+
+/* Typedefs, Enums, and Structs
+ * ***********************************************/
 
 /** \brief Direction of stepper motor travel */
-typedef enum SM_direction { BACKWARD, FORWARD } SM_dir_t;
+typedef enum SM_direction {
+   SM_RETRACT, ///< Retract direction (towards home)
+   SM_ENGAGE   ///< Engage direction (towards peach)
+} SM_dir_t;
 
 /** \brief The two timers this library supports */
-typedef enum SM_timers { TIMER0, TIMER1 } SM_timer_t;
+typedef enum SM_timers {
+   SM_TIMER_NEEDLE, ///< Timer for Needle Carriage actuator
+   SM_TIMER_RING    ///< Timer for Retaining Ring actuator
+} SM_timer_t;
 
 /** \brief The states a stepper motor can be in */
-typedef enum SM_speed_ramp_state { STOP, ACCEL, DECEL, RUN } SM_SRD_state_t;
+typedef enum SM_speed_ramp_state {
+   SM_STOP,  ///< Stopped (aka parked)
+   SM_ACCEL, ///< Accelerating towards max speed
+   SM_DECEL, ///< Decelerating to speed of 0
+   SM_RUN    ///< Running at max speed
+} SM_SRD_state_t;
 
 /** \brief Holding data used by timer interrupt for speed ramp calculation.
  *
  *  Contains data used by timer interrupt to calculate speed profile.
  *  It is initialized during a call to SM_move(), and when stepper motor is
- *  moving (timer interrupt running) data is read/updated when calculating the
+ *  moving (timer interrupt running) data is read/updated when calculating
+ *  the
  *  new step delays.
  */
 typedef struct speed_ramp_data{

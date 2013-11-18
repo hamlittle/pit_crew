@@ -32,10 +32,10 @@
 /* Global Variables ***********************************************************/
 
 /** \brief The first motor this library supports */
-SM_t *motor0;
+SM_t *needle_motor;
 
 /** \brief The second motor this library supports */
-SM_t *motor1;
+SM_t *ring_motor;
 
 /* Internal Function Prototypes ***********************************************/
 
@@ -45,6 +45,7 @@ static void SM_timer_OVF_handler(SM_t *motor);
 static void SM_timer_start(SM_timer_t timer);
 static void SM_timer_stop(SM_timer_t timer);
 static void SM_timer_set_period(SM_timer_t, uint16_t period);
+static void SM_set_direction(SM_t *motor, SM_dir_t direction);
 static void SM_step(SM_t *driver);
 static unsigned long sqrt_Taylor(unsigned long x);
 
@@ -87,6 +88,10 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
 
    SM_timer_init(motor, timer); // Must come first, as brake modifies the timer
    SM_brake(motor); // handles setting the speed_ramp field to defaults
+
+   LS_PORT.DIRCLR = LS_NEEDLE_PIN_bm | LS_RING_PIN_bm; // set as inputs
+   PORTCFG.MPCMASK = LS_NEEDLE_PIN_bm | LS_RING_PIN_bm;
+   LS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc; // hi on press
 }
 
 /** \brief Move the stepper motor a given number of steps.
@@ -114,11 +119,11 @@ void SM_move(SM_t *motor,
 
    // Set direction from sign on step value.
    if (step < 0){
-      speed_ramp->direction = BACKWARD;
+      SM_set_direction(motor, SM_RETRACT);
       step = -step;
    }
    else{
-      speed_ramp->direction = FORWARD;
+      SM_set_direction(motor, SM_ENGAGE);
    }
 
    // If moving only 1 step.
@@ -126,12 +131,12 @@ void SM_move(SM_t *motor,
       // Move one step...
       speed_ramp->accel_count = -1;
       // ...in DECEL state.
-      speed_ramp->run_state = DECEL;
+      speed_ramp->run_state = SM_DECEL;
       // Just use a short delay
-      speed_ramp->step_delay = T1_FREQ / 1000; //1ms delay
+      speed_ramp->step_delay = TIMER_FREQ / 1000; //1ms delay
 
       // use dummy period as first period, has no effect on motor
-      SM_timer_set_period(motor->timer, T1_FREQ / 100000); // 10us to first step
+      SM_timer_set_period(motor->timer, TIMER_FREQ / 100000); // 10us delay
       SM_timer_start(motor->timer);
    }
    // Only move if number of steps to move is not zero.
@@ -185,17 +190,17 @@ void SM_move(SM_t *motor,
       // state.
       if (speed_ramp->step_delay <= speed_ramp->min_delay){
          speed_ramp->step_delay = speed_ramp->min_delay;
-         speed_ramp->run_state = RUN;
+         speed_ramp->run_state = SM_RUN;
       }
       else{
-         speed_ramp->run_state = ACCEL;
+         speed_ramp->run_state = SM_ACCEL;
       }
 
       // Reset counter.
       speed_ramp->accel_count = 0;
 
       // use dummy period as first period, has no effect on motor
-      SM_timer_set_period(motor->timer, T1_FREQ / 100000); // 10us to first step
+      SM_timer_set_period(motor->timer, TIMER_FREQ / 100000); // 10us delay
       SM_timer_start(motor->timer);
    }
 }
@@ -258,8 +263,8 @@ void SM_brake(SM_t *motor) {
  *
  * \param[in] speed_ramp the speed ramp to initialize */
 static void SM_speed_ramp_init(SM_SRD_t *speed_ramp) {
-   speed_ramp->run_state = STOP;
-   speed_ramp->direction = FORWARD;
+   speed_ramp->run_state = SM_STOP;
+   speed_ramp->direction = SM_ENGAGE;
    speed_ramp->step_delay = 0;
    speed_ramp->decel_start = 0;
    speed_ramp->decel_val = 0;
@@ -282,15 +287,16 @@ static void SM_speed_ramp_init(SM_SRD_t *speed_ramp) {
  * \param[in] speed_ramp The speed ramp
  */
 static void SM_timer_init(SM_t *motor, SM_timer_t timer) {
-   if (timer == TIMER0) {
-      TC0_ConfigWGM(&SM_TIMER0, TC_WGMODE_NORMAL_gc);
-      TC0_ConfigClockSource(&SM_TIMER0, TC_CLKSEL_DIV64_gc);/* 32M/64 == 500K */
-      motor0 = motor;
+   /* 32M/256 == 125K Hz*/
+   if (timer == SM_TIMER_NEEDLE) {
+      TC0_ConfigWGM(&TIMER_NEEDLE, TC_WGMODE_NORMAL_gc);
+      TC0_ConfigClockSource(&TIMER_NEEDLE, TC_CLKSEL_DIV256_gc);
+      needle_motor = motor;
    }
    else {
-      TC1_ConfigWGM(&SM_TIMER1, TC_WGMODE_NORMAL_gc);
-      TC1_ConfigClockSource(&SM_TIMER1, TC_CLKSEL_DIV64_gc);/* 32M/64 == 500K */
-      motor1 = motor;
+      TC1_ConfigWGM(&TIMER_RING, TC_WGMODE_NORMAL_gc);
+      TC1_ConfigClockSource(&TIMER_RING, TC_CLKSEL_DIV256_gc);
+      ring_motor = motor;
    }
 
    motor->timer = timer;
@@ -303,8 +309,16 @@ static void SM_timer_OVF_handler(SM_t *motor) {
    /* set next step delay */
    SM_timer_set_period(motor->timer, speed_ramp->step_delay);
 
+   /* check if we've in home position */
+   if (motor->speed_ramp.direction == SM_RETRACT) {
+      if ((motor == needle_motor) && (LS_PORT.IN & LS_NEEDLE_PIN_bm)) {
+         SM_brake(motor);
+         printf("Ring Carriage Homed");
+      }
+   }
+
    switch(speed_ramp->run_state) {
-      case STOP:
+      case SM_STOP:
          speed_ramp->step_count = 0;
          speed_ramp->rest = 0;
 
@@ -312,7 +326,7 @@ static void SM_timer_OVF_handler(SM_t *motor) {
          SM_timer_stop(motor->timer);
          break;
 
-      case ACCEL:
+      case SM_ACCEL:
          SM_step(motor);
          ++(speed_ramp->step_count);
          ++(speed_ramp->accel_count);
@@ -326,18 +340,18 @@ static void SM_timer_OVF_handler(SM_t *motor) {
          // Check if we should start deceleration.
          if (speed_ramp->step_count >= speed_ramp->decel_start) {
             speed_ramp->accel_count = speed_ramp->decel_val;
-            speed_ramp->run_state = DECEL;
+            speed_ramp->run_state = SM_DECEL;
          }
          // Check if we hit max speed.
          else if (new_step_delay <= speed_ramp->min_delay) {
             speed_ramp->last_accel_delay = new_step_delay;
             new_step_delay = speed_ramp->min_delay;
             speed_ramp->rest = 0;
-            speed_ramp->run_state = RUN;
+            speed_ramp->run_state = SM_RUN;
          }
          break;
 
-      case RUN:
+      case SM_RUN:
          SM_step(motor);
          ++(speed_ramp->step_count);
          new_step_delay = speed_ramp->min_delay;
@@ -347,11 +361,11 @@ static void SM_timer_OVF_handler(SM_t *motor) {
             speed_ramp->accel_count = speed_ramp->decel_val;
             // Start decelaration with same delay as accel ended with.
             new_step_delay = speed_ramp->last_accel_delay;
-            speed_ramp->run_state = DECEL;
+            speed_ramp->run_state = SM_DECEL;
          }
          break;
 
-      case DECEL:
+      case SM_DECEL:
          SM_step(motor);
          ++(speed_ramp->step_count);
          ++(speed_ramp->accel_count);
@@ -364,7 +378,7 @@ static void SM_timer_OVF_handler(SM_t *motor) {
 
          // Check if we at last step
          if (speed_ramp->accel_count >= 0){
-            speed_ramp->run_state = STOP;
+            speed_ramp->run_state = SM_STOP;
          }
          break;
    }
@@ -381,14 +395,38 @@ static void SM_timer_OVF_handler(SM_t *motor) {
  * \param[in] timer the timer to set (TIMER0 or TIMER1)
  * \param[in] period the new timer period (TOP) */
 static void SM_timer_set_period(SM_timer_t timer, uint16_t period) {
-   if (timer == TIMER0) {
-      TC_SetCount(&SM_TIMER0, 0x0000);
-      TC_SetPeriod(&SM_TIMER0, period);
+   if (timer == SM_TIMER_NEEDLE) {
+      TC_SetCount(&TIMER_RING, 0x0000);
+      TC_SetPeriod(&TIMER_NEEDLE, period);
    }
    else {
-      TC_SetCount(&SM_TIMER1, 0x0000);
-      TC_SetPeriod(&SM_TIMER1, period);
+      TC_SetCount(&TIMER_RING, 0x0000);
+      TC_SetPeriod(&TIMER_RING, period);
    }
+}
+
+/** \brief Sets the motor's direction.
+ *
+ * Sets the stepper motor drivers direction pin to move the motor in the
+ * desired direction. FORWARD moves the motor downwards (engage), BACKWARD
+ * moves the motor up (towards home position, retract). If the direction is
+ * incorrect, simply swap the motor leads.
+ *
+ * \param[in] motor The motor whose direction to set
+ * \param[in] direction The direction to move
+ *                      (FORWARD == down, BACKWARD == up) */
+static void SM_set_direction(SM_t *motor, SM_dir_t direction) {
+
+   /* set the direction, swap motor leads if wrong
+    * FORWARD moves the motor down (engage), BACKWARD moves it up (retract) */
+   if (direction == SM_ENGAGE) {
+      motor->port->OUTCLR = motor->DIRECTION_bm;
+   }
+   else {
+      motor->port->OUTSET = motor->DIRECTION_bm;
+   }
+
+   motor->speed_ramp.direction = direction;
 }
 
 /** \brief Enables OVF interrupts on the given timer.
@@ -398,11 +436,11 @@ static void SM_timer_set_period(SM_timer_t timer, uint16_t period) {
  *
  * \param[in] timer the timer to start */
 static void SM_timer_start(SM_timer_t timer) {
-   if (timer == TIMER0) {
-      TC0_SetOverflowIntLevel(&SM_TIMER0, TC_OVFINTLVL_HI_gc);
+   if (timer == SM_TIMER_NEEDLE) {
+      TC0_SetOverflowIntLevel(&TIMER_NEEDLE, TC_OVFINTLVL_HI_gc);
    }
    else {
-      TC1_SetOverflowIntLevel(&SM_TIMER1, TC_OVFINTLVL_HI_gc);
+      TC1_SetOverflowIntLevel(&TIMER_RING, TC_OVFINTLVL_HI_gc);
    }
 
    /* enable hi level interrupts */
@@ -417,11 +455,11 @@ static void SM_timer_start(SM_timer_t timer) {
  *
  * \param[in] timer the timer to stop. */
 static void SM_timer_stop(SM_timer_t timer) {
-   if (timer == TIMER0) {
-      TC0_SetOverflowIntLevel(&SM_TIMER0, TC_OVFINTLVL_OFF_gc);
+   if (timer == SM_TIMER_NEEDLE) {
+      TC0_SetOverflowIntLevel(&TIMER_NEEDLE, TC_OVFINTLVL_OFF_gc);
    }
    else {
-      TC1_SetOverflowIntLevel(&SM_TIMER1, TC_OVFINTLVL_OFF_gc);
+      TC1_SetOverflowIntLevel(&TIMER_RING, TC_OVFINTLVL_OFF_gc);
    }
 }
 
@@ -436,20 +474,10 @@ static void SM_timer_stop(SM_timer_t timer) {
  *  \param[in] direction The direction to move (FORWARD or BACKWARD) */
 void SM_step(SM_t *motor) {
    PORT_t *port = motor->port;
-   uint8_t DIRECTION_bm = motor->DIRECTION_bm;
    uint8_t STEP_bm = motor->STEP_bm;
 
-   port->OUTCLR = STEP_bm;
-
-   /* set the direction, swap motor leads if wrong */
-   if (motor->speed_ramp.direction == FORWARD) {
-      port->OUTSET = DIRECTION_bm;
-   }
-   else {
-      port->OUTCLR = DIRECTION_bm;
-   }
-
    /* step once */
+   port->OUTCLR = STEP_bm;
    delay_us(2);
    port->OUTSET = STEP_bm;
 }
@@ -502,9 +530,9 @@ static unsigned long sqrt_Taylor(unsigned long x) {
  *  position, when it stops. A new step delay is calculated to follow the
  *  desired speed profile based on the accel/decel parameters from the initial
  *  SM_move() command.  */
-ISR(SM_TIMER0_OVF_vect)
+ISR(TIMER_NEEDLE_OVF_vect)
 {
-   SM_timer_OVF_handler(motor0);
+   SM_timer_OVF_handler(needle_motor);
 }
 
 /** \brief Timer 1 overflow ISR.
@@ -513,8 +541,8 @@ ISR(SM_TIMER0_OVF_vect)
  *  position, when it stops. A new step delay is calculated to follow the
  *  desired speed profile based on the accel/decel parameters from the initial
  *  SM_move() command.  */
-ISR(SM_TIMER1_OVF_vect)
+ISR(TIMER_RING_OVF_vect)
 {
-   SM_timer_OVF_handler(motor1);
+   SM_timer_OVF_handler(ring_motor);
 }
 

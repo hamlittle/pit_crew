@@ -3,7 +3,8 @@
  * \brief System software for testing the linear actuators.
  *
  * This test follows directly from AVR446: Linear Speed Control of Stepper
- * Motors. This test is simply a port of the code provided with this App Note to
+ * SM_needles. This test is simply a port of the code provided with this App
+ * Note to
  * the Xmega Platform. On startup, a help menu is presented which explains how
  * to run the tests.
  *
@@ -31,12 +32,10 @@
 
 /* Include Directives *********************************************************/
 
-#include "test_linear_actuator.h"
+#include "test_limit_switches.h"
 
 /* Global Data ****************************************************************/
 
-/* \brief The motor we are controlling */
-SM_t motor;
 
 /* Function Definitions *******************************************************/
 
@@ -122,10 +121,21 @@ static void setup_USART_BC(void) {
    USART_BC_init();
 }
 
-/// \todo TODO document setup_motor()
-static void setup_motor() {
-   SM_init(&motor, &SM_port, SM_DISABLE_bm, SM_DIRECTION_bm, SM_STEP_bm,
-           SM_TIMER);
+/** \brief Initializes the stepper motors.
+ *
+ * Calls into the stepper_motor.c library to initialize two to linear
+ * actuators.  The pin values and timers used for each motor are defined in
+ * this file's header file.
+ *
+ * \param[in] needle_motor The needle motor to initialize
+ * \param[in] ring_motor The ring motor to initialize */
+static void setup_motors(SM_t *needle_motor, SM_t *ring_motor) {
+   SM_init(needle_motor, &SM_port, SM_NEEDLE_DISABLE_bm, SM_NEEDLE_DIRECTION_bm,
+           SM_NEEDLE_STEP_bm, SM_NEEDLE_TIMER);
+   SM_init(ring_motor, &SM_port, SM_RING_DISABLE_bm, SM_RING_DIRECTION_bm,
+           SM_RING_STEP_bm, SM_RING_TIMER);
+   SM_enable(needle_motor);
+   SM_enable(ring_motor);
 }
 
 /** \brief main loop to run tests.
@@ -138,14 +148,17 @@ int main(void) {
 
    int16_t position = 0;
    int16_t steps = 1000;
-   uint16_t acceleration = 100;
-   uint16_t deceleration = 100;
+   uint16_t accel = 100;
+   uint16_t decel = 100;
    uint16_t speed = 800;
 
    PS_t pressure_sensor;
 
-   bool cmd_ok = false;
-   char command_buffer[USART_RX_BUFFER_SIZE];
+   SM_t SM_needle;
+   SM_t SM_ring;
+
+   command_t command;
+   uint16_t steps_left = 0;
 
    /* call all of the setup_* functions */
    cli();
@@ -154,118 +167,77 @@ int main(void) {
    setup_switches(switch_mask);
    setup_pressure_sensor(&pressure_sensor);
    setup_USART_BC();
-   setup_motor();
+   setup_motors(&SM_needle, &SM_ring);
    sei();
 
    /* shows the help menu */
    show_help_message();
 
    /* show the current state of the linear actuator */
-   show_motor_data(position, acceleration, deceleration, speed, steps);
+   show_motor_data(position, accel, decel, speed, steps);
 
    while (1) {
-      cmd_ok = false;
-      // If a command is received, check the command and act on it.
-      if (USART_BC_get_string(command_buffer)) {
-         if (command_buffer[0] == 'm') {
-            // Move with...
-            if (command_buffer[1] == ' '){
-               // ...number of steps given.
-               steps = atoi((const char *)command_buffer+2);
-               SM_move(&motor, steps, acceleration, deceleration, speed);
-               position += steps;
-               cmd_ok = true;
-               printf("\n\r  ");
-            }
-            else if (command_buffer[1] == 'o'){
-               if (command_buffer[2] == 'v'){
-                  if (command_buffer[3] == 'e'){
-                     // ...all parameters given
-                     if (command_buffer[4] == ' '){
-                        int i = 6;
-                        steps = atoi((const char *)command_buffer+5);
-                        while ((command_buffer[i]!=' ') &&
-                               (command_buffer[i]!='\n')) {
-                           i++;
-                        }
-                        i++;
-                        acceleration = atoi((const char *)command_buffer+i);
-                        while ((command_buffer[i]!=' ') &&
-                               (command_buffer[i]!='\n')) {
-                           i++;
-                        }
-                        i++;
-                        deceleration = atoi((const char *)command_buffer+i);
-                        while ((command_buffer[i]!=' ') &&
-                               (command_buffer[i]!='\n')) {
-                           i++;
-                        }
-                        i++;
-                        speed = atoi((const char *)command_buffer+i);
-                        SM_move(&motor, steps, acceleration,
-                                deceleration, speed);
-                        position += steps;
-                        cmd_ok = true;
-                        printf("\n\r  ");
-                     }
-                  }
-               }
-            }
-         }
-         else if (command_buffer[0] == 'a'){
-            // Set acceleration.
-            if (command_buffer[1] == ' '){
-               acceleration = atoi((const char *)command_buffer+2);
-               cmd_ok = true;
-            }
-         }
-         else if (command_buffer[0] == 'd'){
-            // Set deceleration.
-            if (command_buffer[1] == ' '){
-               deceleration = atoi((const char *)command_buffer+2);
-               cmd_ok = true;
-            }
-         }
-         else if (command_buffer[0] == 's'){
-            if (command_buffer[1] == ' '){
-               speed = atoi((const char *)command_buffer+2);
-               cmd_ok = true;
-            }
-         }
-         else if (command_buffer[0] == '\r'){  // hyper terminal sends \r\n
-            SM_move(&motor, steps, acceleration, deceleration, speed);
+
+      switch(command = parse_command(&steps, &accel, &decel, &speed)) {
+
+         case STEP:
+            SM_move(&SM_needle, steps, accel, decel, speed);
             position += steps;
-            cmd_ok = true;
-         }
-         else if (command_buffer[0] == '?'){
-            show_help_message();
-            cmd_ok = true;
-         }
+            printf("\n\n");
+            break;
 
-         // Send help if invalid command is received.
-         if (!cmd_ok) {
+         case MOVE:
+            SM_move(&SM_needle, steps, accel, decel, speed);
+            position += steps;
+            printf("\n\n");
+            break;
+
+         case ACCEL:
+         case DECEL:
+         case SPEED:
+            printf("\n\n");
+            break;
+
+         case REPEAT:
+            SM_move(&SM_needle, steps, accel, decel, speed);
+            position += steps;
+            printf("\n\n");
+            break;
+
+         case HELP:
             show_help_message();
-         }
-         else {
-            while (motor.speed_ramp.run_state != STOP) {
-               if (READ_SWITCHES & PIN6_bm) {
-                  SM_brake(&motor);
-                  printf("Motor parked\n");
-               }
-               printf("Running... Steps Left: %d\n",
-                      steps - motor.speed_ramp.step_count);
-               delay_ms(250);
+            break;
+
+         case NONE:
+            break;
+
+         default:
+            show_help_message();
+            break;
+      }
+
+      if ((command != HELP) && (command != NONE)) {
+         while (SM_get_motor_state(&SM_needle) != SM_STOP) {
+            if (READ_SWITCHES & PIN6_bm) {
+               SM_brake(&SM_needle);
+               printf("SM_needle parked\n");
             }
+            if (steps > 0) {
+               steps_left = steps - SM_needle.speed_ramp.step_count;
+            }
+            else {
+               steps_left = -1*steps - SM_needle.speed_ramp.step_count;
 
-            printf("Done with move\n");
+            }
+            printf("    Running... Steps Left: %d\n",
+                   steps_left);
+            delay_ms(250);
          }
 
-         // Clear RXbuffer.
-         USART_BC_flush_RX_buffer();
+         printf("    Done with command\n");
 
-         show_motor_data(position, acceleration, deceleration, speed, steps);
-      }//end if (cmd)
-
+         show_motor_data(position, accel, decel, speed, steps);
+      }
    }//end while (1)
 }
 
@@ -281,16 +253,117 @@ static void show_help_message(void)
 /*! \brief Sends out data.
  *
  *  Outputs the values of the data you can control by serial interface
- *  and the current position of the stepper motor.
+ *  and the current position of the stepper SM_needle.
  *
  *  \param acceleration Accelration setting.
  *  \param deceleration Deceleration setting.
  *  \param speed Speed setting.
- *  \param steps Position of the stepper motor.
+ *  \param steps Position of the stepper SM_needle.
  */
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
                             int16_t steps) {
-   printf("\n\r Motor pos: %d    a: %d    d: %d    s: %d    m: %d\n\r>",
+   printf("\n\r SM_needle pos: %d    a: %d    d: %d    s: %d    m: %d\n\r>",
           position, acceleration, deceleration, speed, steps);
+}
+
+
+static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
+                               uint16_t *speed) {
+   char command_buffer[USART_RX_BUFFER_SIZE];
+   bool cmd_ok = false;
+   command_t command = NONE;
+   uint8_t command_ndx = 0;
+
+   // If a command is received, check the command and act on it.
+   if (USART_BC_get_string(command_buffer))
+   {
+      if (command_buffer[command_ndx] == 'm') {
+         ++command_ndx;
+         // Move with...
+         if (command_buffer[command_ndx++] == ' '){
+            // ...number of steps given.
+            *steps = atoi((const char *)command_buffer+2);
+            cmd_ok = true;
+            command = STEP;
+         }
+         else if (command_buffer[command_ndx++] == 'o'){
+            if (command_buffer[command_ndx++] == 'v'){
+               if (command_buffer[command_ndx++] == 'e'){
+                  // ...all parameters given
+                  if (command_buffer[command_ndx++] == ' '){
+                     *steps = atoi((const char *)command_buffer+command_ndx);
+
+                     command_ndx =
+                        find_next_param(command_buffer, ++command_ndx);
+                     *accel = atoi((const char *)command_buffer+command_ndx);
+
+                     command_ndx =
+                        find_next_param(command_buffer, ++command_ndx);
+                     *decel = atoi((const char *)command_buffer+command_ndx);
+
+                     command_ndx =
+                        find_next_param(command_buffer, ++command_ndx);
+                     *speed = atoi((const char *)command_buffer+command_ndx);
+
+                     cmd_ok = true;
+                     command = MOVE;
+                  }
+               }
+            }
+         }
+      }
+      else if (command_buffer[command_ndx] == 'a'){
+         ++command_ndx;
+         // Set acceleration.
+         if (command_buffer[command_ndx++] == ' '){
+            *accel = atoi((const char *)command_buffer+command_ndx);
+            cmd_ok = true;
+            command = ACCEL;
+         }
+      }
+      else if (command_buffer[command_ndx] == 'd'){
+         ++command_ndx;
+         // Set deceleration.
+         if (command_buffer[command_ndx++] == ' '){
+            *decel = atoi((const char *)command_buffer+command_ndx);
+            cmd_ok = true;
+            command = DECEL;
+         }
+      }
+      else if (command_buffer[command_ndx] == 's'){
+         ++command_ndx;
+         if (command_buffer[command_ndx] == ' '){
+            *speed = atoi((const char *)command_buffer+command_ndx);
+            cmd_ok = true;
+            command = ACCEL;
+         }
+      }
+      else if (command_buffer[command_ndx] == '\r'){// hyper terminal sends \r\n
+         cmd_ok = true;
+         command = REPEAT;
+      }
+      else if (command_buffer[command_ndx] == '?'){
+         cmd_ok = true;
+         command = HELP;
+      }
+      else {
+         command = HELP; // invalid command
+      }
+
+      // Clear RXbuffer.
+      USART_BC_flush_RX_buffer();
+   }//end if (cmd)
+
+   return command;
+}
+
+static uint8_t find_next_param(char *command_buffer, uint8_t start_position) {
+   uint8_t ndx = start_position;
+
+   while ((command_buffer[ndx]!=' ') &&
+          (command_buffer[ndx]!='\n')) {
+      ++ndx;
+   }
+   return ++ndx;
 }
