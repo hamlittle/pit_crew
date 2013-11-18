@@ -67,6 +67,7 @@
 
 #include <avr/io.h>
 #include "tc_driver.h"
+#include "stepper_motor.h"
 
 /* Macro Defintions ***********************************************************/
 /** \name Limit Switch Definitions */
@@ -94,7 +95,7 @@
 /** \name Stepper Motor Definitions */
 ///@{
 
-#define SPR 200 ///< Motor steps per full revolution
+#define SPR 400 ///< Motor steps per full revolution
 
 ///@}
 
@@ -115,13 +116,8 @@
 /** \brief Returns the state of the motor.
  *
  * The four states of the motor are defined in the SM_SRD_state_t enum.
- * They are:
- *    - SM_STOP  the motor is parked \sa SM_brake()
- *    - SM_ACCEL the motor is accelerating to max speed
- *    - SM_DECEL the motor is decelerating to rest
- *    - SM_RUN   the motor is running at max speed (b/w ACCEL and DECEL)
  *
- * \param[in] motor pointer to the motor to get the state (type SM_t*)
+ * \param[in] _motor pointer to the motor to get the state (type SM_t*)
  *
  * \return The motor's state
  * \retval SM_STOP the motor is parked \sa SM_brake()
@@ -132,13 +128,12 @@
 
 ///@}
 
-/* Typedefs, Enums, and Structs
- * ***********************************************/
+/* Typedefs, Enums, and Structs ***********************************************/
 
 /** \brief Direction of stepper motor travel */
 typedef enum SM_direction {
-   SM_RETRACT, ///< Retract direction (towards home)
-   SM_ENGAGE   ///< Engage direction (towards peach)
+   SM_RETRACT, ///< Retract direction (towards home, negative step)
+   SM_ENGAGE   ///< Engage direction (towards peach, positive step)
 } SM_dir_t;
 
 /** \brief The two timers this library supports */
@@ -164,7 +159,7 @@ typedef enum SM_speed_ramp_state {
  *  new step delays.
  */
 typedef struct speed_ramp_data{
-   SM_SRD_state_t run_state;  ///< What part of speed ramp we are in
+   volatile SM_SRD_state_t run_state;  ///< What part of speed ramp we are in
    SM_dir_t direction;        ///< Stepper motor direction
    uint16_t step_delay;       ///< next timer delay period, == acc rate at start
    uint16_t decel_start;      ///< What step_pos to start deceleration
@@ -196,7 +191,7 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
 ///@}
 
 void SM_move(SM_t *motor,
-             int16_t step, uint16_t accel, uint16_t decel, uint16_t speed);
+             int16_t steps, uint16_t accel, uint16_t decel, uint16_t speed);
 void SM_enable(SM_t *motor);
 void SM_disable(SM_t *motor);
 void SM_brake(SM_t *motor);

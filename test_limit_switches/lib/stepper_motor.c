@@ -37,10 +37,20 @@ SM_t *needle_motor;
 /** \brief The second motor this library supports */
 SM_t *ring_motor;
 
+/** \brief Global flag set when the needle carriage is running.
+ *
+ * This flag is checked in the Retaining Ring ISR OVF interrupt to ensure that
+ * the two motors are not run at the same time. Testing indicates that
+ * SM_timer_OVF_handler() is not fast enough to allow both motors to run at the
+ * same time, as this leads to a race condition at higher than moderate
+ * speeds. */
+bool needle_motor_running = false;
+
 /* Internal Function Prototypes ***********************************************/
 
 static void SM_speed_ramp_init(SM_SRD_t *speed_ramp);
 static void SM_timer_init(SM_t *motor, SM_timer_t timer);
+static void SM_limit_switch_init(void);
 static void SM_timer_OVF_handler(SM_t *motor);
 static void SM_timer_start(SM_timer_t timer);
 static void SM_timer_stop(SM_timer_t timer);
@@ -88,10 +98,7 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
 
    SM_timer_init(motor, timer); // Must come first, as brake modifies the timer
    SM_brake(motor); // handles setting the speed_ramp field to defaults
-
-   LS_PORT.DIRCLR = LS_NEEDLE_PIN_bm | LS_RING_PIN_bm; // set as inputs
-   PORTCFG.MPCMASK = LS_NEEDLE_PIN_bm | LS_RING_PIN_bm;
-   LS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc; // hi on press
+   SM_limit_switch_init(); // set up the limit switches
 }
 
 /** \brief Move the stepper motor a given number of steps.
@@ -116,6 +123,11 @@ void SM_move(SM_t *motor,
    uint16_t accel_lim;
 
    SM_SRD_t *speed_ramp = &(motor->speed_ramp);
+
+   // set the running flag is we are starting the needle carriage  motor
+   if (motor == needle_motor) {
+      needle_motor_running = true;
+   }
 
    // Set direction from sign on step value.
    if (step < 0){
@@ -302,6 +314,17 @@ static void SM_timer_init(SM_t *motor, SM_timer_t timer) {
    motor->timer = timer;
 }
 
+/** \brief Initializes the limit switches
+ *
+ * The limit switches go hi when depressed, and their value is checked in the
+ * SM_timer_OVF_handler(). If the motor is retracting and hits the limit
+ * switch, the current movement is cancelled with a call to SM_brake(). */
+static void SM_limit_switch_init(void) {
+   LS_PORT.DIRCLR = LS_NEEDLE_PIN_bm | LS_RING_PIN_bm; // set as inputs
+   PORTCFG.MPCMASK = LS_NEEDLE_PIN_bm | LS_RING_PIN_bm;
+   LS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc; // hi on press
+}
+
 static void SM_timer_OVF_handler(SM_t *motor) {
    uint16_t new_step_delay = 0;
    SM_SRD_t *speed_ramp = &(motor->speed_ramp);
@@ -313,7 +336,11 @@ static void SM_timer_OVF_handler(SM_t *motor) {
    if (motor->speed_ramp.direction == SM_RETRACT) {
       if ((motor == needle_motor) && (LS_PORT.IN & LS_NEEDLE_PIN_bm)) {
          SM_brake(motor);
-         printf("Ring Carriage Homed");
+         printf("Needle Carriage Homed");
+      }
+      else if ((motor == ring_motor) && (LS_PORT.IN & LS_RING_PIN_bm)) {
+         SM_brake(motor);
+         printf("Retaining Ring Homed\n");
       }
    }
 
@@ -324,6 +351,9 @@ static void SM_timer_OVF_handler(SM_t *motor) {
 
          /* stop the timer */
          SM_timer_stop(motor->timer);
+
+         /* clear the running flag */
+         needle_motor_running = false;
          break;
 
       case SM_ACCEL:
@@ -532,7 +562,10 @@ static unsigned long sqrt_Taylor(unsigned long x) {
  *  SM_move() command.  */
 ISR(TIMER_NEEDLE_OVF_vect)
 {
-   SM_timer_OVF_handler(needle_motor);
+   if ((needle_motor->speed_ramp.direction == SM_RETRACT) ||
+       (SM_get_motor_state(ring_motor) == SM_STOP)) {
+      SM_timer_OVF_handler(needle_motor);
+   }
 }
 
 /** \brief Timer 1 overflow ISR.
@@ -543,6 +576,9 @@ ISR(TIMER_NEEDLE_OVF_vect)
  *  SM_move() command.  */
 ISR(TIMER_RING_OVF_vect)
 {
-   SM_timer_OVF_handler(ring_motor);
+   if ((ring_motor->speed_ramp.direction == SM_ENGAGE) ||
+       (SM_get_motor_state(needle_motor) == SM_STOP)) {
+      SM_timer_OVF_handler(ring_motor);
+   }
 }
 

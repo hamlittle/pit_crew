@@ -1,14 +1,14 @@
-/** \file test_linear_actuator.c
+/** \file test_limit_switches.c
  *
  * \brief System software for testing the linear actuators.
  *
  * This test follows directly from AVR446: Linear Speed Control of Stepper
- * SM_needles. This test is simply a port of the code provided with this App
+ * LA_needles. This test is simply a port of the code provided with this App
  * Note to
  * the Xmega Platform. On startup, a help menu is presented which explains how
  * to run the tests.
  *
- * \todo TODO test_linear_actuator.c documentation
+ * \todo TODO test_limit_switches.c documentation
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -129,13 +129,13 @@ static void setup_USART_BC(void) {
  *
  * \param[in] needle_motor The needle motor to initialize
  * \param[in] ring_motor The ring motor to initialize */
-static void setup_motors(SM_t *needle_motor, SM_t *ring_motor) {
-   SM_init(needle_motor, &SM_port, SM_NEEDLE_DISABLE_bm, SM_NEEDLE_DIRECTION_bm,
-           SM_NEEDLE_STEP_bm, SM_NEEDLE_TIMER);
-   SM_init(ring_motor, &SM_port, SM_RING_DISABLE_bm, SM_RING_DIRECTION_bm,
-           SM_RING_STEP_bm, SM_RING_TIMER);
-   SM_enable(needle_motor);
-   SM_enable(ring_motor);
+static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator) {
+   LA_init(needle_actuator, LA_NEEDLE_PITCH, &LA_port, LA_NEEDLE_DISABLE_bm,
+           LA_NEEDLE_DIRECTION_bm, LA_NEEDLE_STEP_bm, LA_NEEDLE_TIMER);
+   LA_init(ring_actuator, LA_RING_PITCH, &LA_port, LA_RING_DISABLE_bm,
+           LA_RING_DIRECTION_bm, LA_RING_STEP_bm, LA_RING_TIMER);
+   LA_enable(needle_actuator);
+   LA_enable(ring_actuator);
 }
 
 /** \brief main loop to run tests.
@@ -154,8 +154,8 @@ int main(void) {
 
    PS_t pressure_sensor;
 
-   SM_t SM_needle;
-   SM_t SM_ring;
+   LA_t LA_needle;
+   LA_t LA_ring;
 
    command_t command;
    uint16_t steps_left = 0;
@@ -167,7 +167,7 @@ int main(void) {
    setup_switches(switch_mask);
    setup_pressure_sensor(&pressure_sensor);
    setup_USART_BC();
-   setup_motors(&SM_needle, &SM_ring);
+   setup_linear_actuators(&LA_needle, &LA_ring);
    sei();
 
    /* shows the help menu */
@@ -181,15 +181,15 @@ int main(void) {
       switch(command = parse_command(&steps, &accel, &decel, &speed)) {
 
          case STEP:
-            SM_move(&SM_needle, steps, accel, decel, speed);
-            SM_move(&SM_ring, steps, accel, decel, speed);
+            LA_move(&LA_needle, steps, accel, decel, speed);
+            LA_move(&LA_ring, steps, accel, decel, speed);
             position += steps;
             printf("\n\n");
             break;
 
          case MOVE:
-            SM_move(&SM_needle, steps, accel, decel, speed);
-            SM_move(&SM_ring, steps, accel, decel, speed);
+            LA_move(&LA_needle, steps, accel, decel, speed);
+            LA_move(&LA_ring, steps, accel, decel, speed);
             position += steps;
             printf("\n\n");
             break;
@@ -201,8 +201,8 @@ int main(void) {
             break;
 
          case REPEAT:
-            SM_move(&SM_needle, steps, accel, decel, speed);
-            SM_move(&SM_ring, steps, accel, decel, speed);
+            LA_move(&LA_needle, steps, accel, decel, speed);
+            LA_move(&LA_ring, steps, accel, decel, speed);
             position += steps;
             printf("\n\n");
             break;
@@ -220,21 +220,21 @@ int main(void) {
       }
 
       if ((command != HELP) && (command != NONE)) {
-         while (SM_get_motor_state(&SM_needle) != SM_STOP) {
+         while (LA_get_motor_state(&LA_needle) != SM_STOP) {
             if (READ_SWITCHES & PIN6_bm) {
-               SM_brake(&SM_needle);
-               SM_brake(&SM_ring);
+               LA_brake(&LA_needle);
+               LA_brake(&LA_ring);
                printf("motors parked\n");
             }
             if (steps > 0) {
-               steps_left = steps - SM_needle.speed_ramp.step_count;
+               steps_left = (int32_t)steps * SPR / LA_needle.pitch
+                  - LA_needle.motor.speed_ramp.step_count;
             }
             else {
-               steps_left = -1*steps - SM_needle.speed_ramp.step_count;
-
+               steps_left = -1 * (int32_t)steps * SPR / LA_needle.pitch
+                  - LA_needle.motor.speed_ramp.step_count;
             }
-            printf("    Running... Steps Left: %d\n",
-                   steps_left);
+            printf("    Running... Steps Left: %d\n", steps_left);
             delay_ms(250);
          }
 
@@ -257,17 +257,17 @@ static void show_help_message(void)
 /*! \brief Sends out data.
  *
  *  Outputs the values of the data you can control by serial interface
- *  and the current position of the stepper SM_needle.
+ *  and the current position of the stepper LA_needle.
  *
  *  \param acceleration Accelration setting.
  *  \param deceleration Deceleration setting.
  *  \param speed Speed setting.
- *  \param steps Position of the stepper SM_needle.
+ *  \param steps Position of the stepper LA_needle.
  */
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
                             int16_t steps) {
-   printf("\n\r SM_needle pos: %d    a: %d    d: %d    s: %d    m: %d\n\r>",
+   printf("\n\r LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d\n\r>",
           position, acceleration, deceleration, speed, steps);
 }
 

@@ -32,24 +32,26 @@
 #include "clksys_driver.h"
 #include "pressure_sensor.h"
 #include "usart_bc.h"
-#include "stepper_motor.h"
+#include "linear_actuator.h"
 
 /* Macro Definitions **********************************************************/
 
 /** \name Stepper Motor Definitions */
 ///@{
 
-#define SM_port PORTA            ///< stepper motor control port
+#define LA_port PORTA            ///< stepper motor control port
 
-#define SM_NEEDLE_DISABLE_bm   PIN0_bm         ///< stepper motor /DISABLE pin
-#define SM_NEEDLE_DIRECTION_bm PIN1_bm         ///< stepper motor DIRECTION pin
-#define SM_NEEDLE_STEP_bm      PIN2_bm         ///< stepper motor STEP pin
-#define SM_NEEDLE_TIMER        SM_TIMER_NEEDLE ///< stepper motor timer to use
+#define LA_NEEDLE_PITCH        500             ///< needle act pitch (0.5in)
+#define LA_NEEDLE_DISABLE_bm   PIN3_bm         ///< needle act /DISABLE pin
+#define LA_NEEDLE_DIRECTION_bm PIN4_bm         ///< needle act DIRECTION pin
+#define LA_NEEDLE_STEP_bm      PIN5_bm         ///< needle act STEP pin
+#define LA_NEEDLE_TIMER        SM_TIMER_NEEDLE ///< needle act timer to use
 
-#define SM_RING_DISABLE_bm   PIN3_bm         ///< stepper motor /DISABLE pin
-#define SM_RING_DIRECTION_bm PIN4_bm         ///< stepper motor DIRECTION pin
-#define SM_RING_STEP_bm      PIN5_bm         ///< stepper motor STEP pin
-#define SM_RING_TIMER        SM_TIMER_RING   ///< stepper motor timer to use
+#define LA_RING_PITCH        125             ///< ring act pitch (0.125in)
+#define LA_RING_DISABLE_bm   PIN0_bm         ///< ring act /DISABLE pin
+#define LA_RING_DIRECTION_bm PIN1_bm         ///< ring act DIRECTION pin
+#define LA_RING_STEP_bm      PIN2_bm         ///< ring act STEP pin
+#define LA_RING_TIMER        SM_TIMER_RING   ///< ring act timer to use
 
 #define BRAKE_PIN_vect PORTR_INT0_vect ///< Brake pin interrupt vector
 
@@ -63,21 +65,23 @@
 const char *help_message =
 "\n\r--------------------------------------------------------------\n\r"
 "Atmel AVR446 - Linear speed control of stepper motor\n\r\n\r"
-"?  - Show help\n\ra [data] - Set acceleration (range: 71 - 32000)\n\r"
-"d [data] - Set deceleration (range: 71 - 32000)\n\r"
-"s [data] - Set speed (range: 12 - motor limit)\n\r"
-"m [data] - Move [data] steps (range: -64000 - 64000)\n\r"
+"?  - Show help\n\ra [data] - Set acceleration (range: 57 to 52K, 2 to 13K)\n\r"
+"d [data] - Set deceleration (range: 57 to 52K, 2 to 13K)\n\r"
+"s [data] - Set speed (range: 10 to 52K, 2 to 13K)\n\r"
+"m [data] - Move [data] steps (range: -32K to 32K, -20K to 20K)\n\r"
 "move [steps] [accel] [decel] [speed]\n\r"
 "         - Move with all parameters given\n\r"
 "<enter>  - Repeat last move\n\r\n\r"
-"acc/dec data given in 0.01*rad/sec^2 (100 = 1 rad/sec^2)\n\r"
-"speed data given in 0.01*rad/sec (100 = 1 rad/sec)\n\r"
+"acc/dec data given in 0.001*in/sec^2 (1000 = 1 in/sec^2)\n\r"
+"speed data given in 0.001*in/sec (1000 = 1 in/sec)\n\r"
+"move data given in 0.001*in (1000 = 1 in\n\r"
 "--------------------------------------------------------------\n\r";
 
 ///@}
 
 /* Typedefs, Enums, and Structs ***********************************************/
 
+/** \brief The command line instruction types */
 typedef enum command_types {
    STEP,   ///< Move the given number of steps
    MOVE,   ///< Move with all the information given
@@ -98,7 +102,7 @@ static void setup_LEDs(void);
 static void setup_switches(uint8_t switch_mask);
 static void setup_pressure_sensor(PS_t *pressure_sensor);
 static void setup_USART_BC(void);
-static void setup_motors(SM_t *needle_motor, SM_t *ring_motor);
+static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator);
 ///@}
 
 static void show_help_message(void);
