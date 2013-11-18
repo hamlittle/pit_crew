@@ -136,7 +136,7 @@ void SM_move(SM_t *motor,
       speed_ramp->step_delay = TIMER_FREQ / 1000; //1ms delay
 
       // use dummy period as first period, has no effect on motor
-      SM_timer_set_period(motor->timer, TIMER_FREQ / 100000); // 10us delay
+      SM_timer_set_period(motor->timer, TIMER_FREQ / 1000); // 1ms delay
       SM_timer_start(motor->timer);
    }
    // Only move if number of steps to move is not zero.
@@ -200,7 +200,7 @@ void SM_move(SM_t *motor,
       speed_ramp->accel_count = 0;
 
       // use dummy period as first period, has no effect on motor
-      SM_timer_set_period(motor->timer, TIMER_FREQ / 100000); // 10us delay
+      SM_timer_set_period(motor->timer, TIMER_FREQ / 1000); // 1ms delay
       SM_timer_start(motor->timer);
    }
 }

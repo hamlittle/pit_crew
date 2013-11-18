@@ -182,12 +182,14 @@ int main(void) {
 
          case STEP:
             SM_move(&SM_needle, steps, accel, decel, speed);
+            SM_move(&SM_ring, steps, accel, decel, speed);
             position += steps;
             printf("\n\n");
             break;
 
          case MOVE:
             SM_move(&SM_needle, steps, accel, decel, speed);
+            SM_move(&SM_ring, steps, accel, decel, speed);
             position += steps;
             printf("\n\n");
             break;
@@ -200,6 +202,7 @@ int main(void) {
 
          case REPEAT:
             SM_move(&SM_needle, steps, accel, decel, speed);
+            SM_move(&SM_ring, steps, accel, decel, speed);
             position += steps;
             printf("\n\n");
             break;
@@ -220,7 +223,8 @@ int main(void) {
          while (SM_get_motor_state(&SM_needle) != SM_STOP) {
             if (READ_SWITCHES & PIN6_bm) {
                SM_brake(&SM_needle);
-               printf("SM_needle parked\n");
+               SM_brake(&SM_ring);
+               printf("motors parked\n");
             }
             if (steps > 0) {
                steps_left = steps - SM_needle.speed_ramp.step_count;
@@ -271,7 +275,6 @@ static void show_motor_data(int16_t position, uint16_t acceleration,
 static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
                                uint16_t *speed) {
    char command_buffer[USART_RX_BUFFER_SIZE];
-   bool cmd_ok = false;
    command_t command = NONE;
    uint8_t command_ndx = 0;
 
@@ -284,7 +287,6 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
          if (command_buffer[command_ndx++] == ' '){
             // ...number of steps given.
             *steps = atoi((const char *)command_buffer+2);
-            cmd_ok = true;
             command = STEP;
          }
          else if (command_buffer[command_ndx++] == 'o'){
@@ -306,7 +308,6 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
                         find_next_param(command_buffer, ++command_ndx);
                      *speed = atoi((const char *)command_buffer+command_ndx);
 
-                     cmd_ok = true;
                      command = MOVE;
                   }
                }
@@ -318,7 +319,6 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
          // Set acceleration.
          if (command_buffer[command_ndx++] == ' '){
             *accel = atoi((const char *)command_buffer+command_ndx);
-            cmd_ok = true;
             command = ACCEL;
          }
       }
@@ -327,7 +327,6 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
          // Set deceleration.
          if (command_buffer[command_ndx++] == ' '){
             *decel = atoi((const char *)command_buffer+command_ndx);
-            cmd_ok = true;
             command = DECEL;
          }
       }
@@ -335,16 +334,13 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
          ++command_ndx;
          if (command_buffer[command_ndx] == ' '){
             *speed = atoi((const char *)command_buffer+command_ndx);
-            cmd_ok = true;
             command = ACCEL;
          }
       }
       else if (command_buffer[command_ndx] == '\r'){// hyper terminal sends \r\n
-         cmd_ok = true;
          command = REPEAT;
       }
       else if (command_buffer[command_ndx] == '?'){
-         cmd_ok = true;
          command = HELP;
       }
       else {

@@ -116,12 +116,18 @@
  *
  * The four states of the motor are defined in the SM_SRD_state_t enum.
  * They are:
- *    - STOP  the motor is parked \sa SM_brake()
- *    - ACCEL the motor is accelerating to max speed
- *    - DECEL the motor is decelerating to rest
- *    - RUN   the motor is running at max speed (b/w ACCEL and DECEL)
+ *    - SM_STOP  the motor is parked \sa SM_brake()
+ *    - SM_ACCEL the motor is accelerating to max speed
+ *    - SM_DECEL the motor is decelerating to rest
+ *    - SM_RUN   the motor is running at max speed (b/w ACCEL and DECEL)
  *
- * \param[in] motor pointer to the motor to get the state (type SM_t*) */
+ * \param[in] motor pointer to the motor to get the state (type SM_t*)
+ *
+ * \return The motor's state
+ * \retval SM_STOP the motor is parked \sa SM_brake()
+ * \retval SM_ACCEL the motor is accelerating to max speed
+ * \retval SM_DECEL the motor is decelerating to rest
+ * \retval SM_RUN the motor is running at max speed */
 #define SM_get_motor_state(_motor) ((_motor)->speed_ramp.run_state)
 
 ///@}
