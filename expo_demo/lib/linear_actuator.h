@@ -85,6 +85,15 @@ typedef struct linear_actuator  {
 #define LA_get_motor_state(_actuator) \
    (SM_get_motor_state(&((_actuator)->motor)))
 
+/** \brief Homes the linear actuator.
+ *
+ * Homing is performed every time the actuator hits its limit switch. However,
+ *        the home position can still be changed by a call to this function.
+ *        This resets the position of the actuator to 0.
+ *
+ * \param[in] _actuator pointer to the actuator to home */
+#define LA_home(_actuator) (SM_home(&((_actuator)->motor)))
+
 ///@}
 
 /* Function Prototypes ********************************************************/
@@ -103,6 +112,7 @@ void LA_move(LA_t *actuator, int16_t dist, uint16_t accel, uint16_t decel,
 void LA_enable(LA_t *actuator);
 void LA_disable(LA_t *actuator);
 void LA_brake(LA_t *actuator);
+int16_t LA_get_position(LA_t *actuator);
 
 #endif /* end of include guard: _LINEAR_ACTUATOR_H_ */
 /** @} */

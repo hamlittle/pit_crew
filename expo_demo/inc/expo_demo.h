@@ -36,6 +36,40 @@
 
 /* Macro Definitions **********************************************************/
 
+/** \name State Machine Definitions */
+///@{
+
+#define LA_NEEDLE_SPEED 1000        ///< needle carriage max speed, 0.001 in/s
+#define LA_NEEDLE_ACCEL 400         ///< needle carriage accel, 0.001 in/s^2
+#define LA_NEEDLE_DECEL 400         ///< needle carriage decel, 0.001 in/s^2
+#define LA_NEEDLE_ENGAGE_DIST 1000  ///< needle carriage engage travel, 0.001 in
+#define LA_NEEDLE_DETECT_DIST 500   ///< needle carriage engage travel, 0.001 in
+/// needle carriage retract travel, 0.001 in
+#define LA_NEEDLE_RETRACT_DIST (-LA_NEEDLE_ENGAGE_DIST-LA_NEEDLE_DETECT_DIST))
+
+#define LA_RING_SPEED 1000        ///< needle carriage max speed, 0.001 in/s
+#define LA_RING_ACCEL 400         ///< needle carriage accel, 0.001 in/s^2
+#define LA_RING_DECEL 400         ///< needle carriage decel, 0.001 in/s^2
+#define LA_RING_RETAIN_DIST 500  ///< needle carriage engage travel, 0.001 in
+/// needle carriage retract travel, 0.001 in
+#define LA_RING_RELEASE_DIST (-LA_RING_RETAIN_DIST)
+///@}
+
+/** \name Safety Switch Defininitions */
+///@{
+
+#define SS_PORT PORTC     ///< safety switch port
+#define SS_PIN_bm PIN4_bm ///< safety swtich pin
+
+/** \brief Check if the safety switch is open
+ *
+ * The safety switch is closed if the safety switch pin is high. When the
+ * switch opens, the 5v signal is no longer connected to the pin, and the
+ * safety switch pin will read low. */
+#define SS_OPEN() (!(SS_PORT.IN & SS_PIN_bm))
+
+///@}
+
 /** \name Stepper Motor Definitions */
 ///@{
 
@@ -54,6 +88,21 @@
 #define LA_RING_TIMER        SM_TIMER_RING   ///< ring act timer to use
 
 #define BRAKE_PIN_vect PORTR_INT0_vect ///< Brake pin interrupt vector
+#define BRAKE_PIN_bm PIN6_bm           ///< Switch 6, translates to PR[0]
+
+///@}
+
+/** \name Macro Defined Functions */
+///@{
+
+/** \brief Returns the current state of the machine.
+ *
+ * The valid states of the machine are enumerated in PC_STATE_t.
+ *
+ * \param[in] machine The machine to get the state of
+ *
+ * \return The current state of the machine */
+#define get_state(_machine) ((_machine)->state)
 
 ///@}
 
@@ -83,15 +132,47 @@ const char *help_message =
 
 /** \brief The command line instruction types */
 typedef enum command_types {
-   STEP,   ///< Move the given number of steps
-   MOVE,   ///< Move with all the information given
-   ACCEL,  ///< Set acceleration
-   DECEL,  ///< Set deceleration
-   SPEED,  ///< Set max speed
-   REPEAT, ///< repeat last move
-   HELP,   ///< Show help menu
-   NONE    ///< No command retrieved
+   STEP1,   ///< Move the given number of steps
+   STEP2,   ///< Move the given number of steps
+   MOVE1,   ///< Move with all the information given
+   MOVE2,   ///< Move with all the information given
+   ACCEL1,  ///< Set acceleration
+   ACCEL2,  ///< Set acceleration
+   DECEL1,  ///< Set deceleration
+   DECEL2,  ///< Set deceleration
+   SPEED1,  ///< Set max speed
+   SPEED2,  ///< Set max speed
+   CAL,     ///< calibrate the pressure sensor
+   SCAN,    ///< scan the sensor
+   HELP,    ///< Show help menu
+   NONE     ///< No command retrieved
 } command_t;
+
+/** \brief The different states for the machine.
+ *
+ * The system is modeled as a finite state machine. These are the states the
+ * machine can be in. */
+typedef enum pit_crew_state {
+   IDLE,      ///< Idling (home state)
+   RETAIN,    ///< Retaining Ring descending
+   ENGAGE,    ///< Needles approaching peach
+   DETECT,    ///< Checking for pits
+   DISENGAGE, ///< Needles retracting
+   RELEASE,   ///< Retaining ring releasing peach
+   PASS,      ///< Tell the user the result
+   STOP       ///< Lid is removed
+} PC_STATE_t;
+
+/** \brief Pit Crew machine.
+ *
+ * Contains the static data for all of the various hardware the board must
+ * interface with, as well as the current state of the machine */
+typedef struct pit_crew_machine  {
+   PC_STATE_t state;
+   LA_t needle_carriage;
+   LA_t retaining_ring;
+   PS_t pressure_sensor;
+} PC_t;
 
 /* Function Prototypes ********************************************************/
 
@@ -100,17 +181,21 @@ typedef enum command_types {
 static void setup_clocks(void);
 static void setup_LEDs(void);
 static void setup_switches(uint8_t switch_mask);
+static void setup_safety_switch(void);
 static void setup_pressure_sensor(PS_t *pressure_sensor);
 static void setup_USART_BC(void);
 static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator);
 ///@}
 
+INLINE void set_state(PC_t *machine, PC_STATE_t state);
 static void show_help_message(void);
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
                             int16_t steps);
-static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
-                               uint16_t *speed);
+static command_t parse_command(int16_t *steps1, uint16_t *accel1,
+                               uint16_t *decel1, uint16_t *speed1,
+                               int16_t *steps2, uint16_t *accel2,
+                               uint16_t *decel2, uint16_t *speed2);
 static uint8_t find_next_param(char *command_buffer, uint8_t start_position);
 
 #endif /* end of include guard: _TEST_LIMIT_SWITCH_H_ */

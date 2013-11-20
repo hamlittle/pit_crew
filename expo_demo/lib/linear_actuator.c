@@ -115,3 +115,17 @@ void LA_disable(LA_t *actuator) {
 void LA_brake(LA_t *actuator) {
    SM_brake(&(actuator->motor));
 }
+
+/** \brief Returns the actuator's position.
+ *
+ * Position data returned is in units of 0.001in. The returned position is the
+ * distance the actuator is away from its home position. The linear actuators
+ * automatically home themselves when they hit the limit switches, however, the
+ * home position can be changed by a call to LA_home().
+ *
+ * \param[in] actuator The actuator to get the position.
+ *
+ * \return Position of the motor since the last home */
+int16_t LA_get_position(LA_t *actuator) {
+   return SM_get_position(&(actuator->motor)) * actuator->pitch / SPR;
+}

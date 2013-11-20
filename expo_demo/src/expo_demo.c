@@ -95,17 +95,30 @@ static void setup_switches(uint8_t switch_mask) {
 
    SWITCH_PORTH.DIR &= ~maskH;
    PORTCFG.MPCMASK = maskH;
-   SWITCH_PORTH.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;}
+   SWITCH_PORTH.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;
+}
 
-   /** \brief Initializes the pressure sensor library.
-    *
-    * This allows for easy interfacing with the sensor through the PS_* library
-    * calls.
-    *
-    * \param[in] pressure_sensor The pressure sensor to initialize */
-   static void setup_pressure_sensor(PS_t *pressure_sensor) {
-      PS_init(pressure_sensor);
-   }
+/** \brief Sets up the safety switch.
+ *
+ * The safety switch is the contact switch between the box and the and the
+ * board the machine is moutned on. The machine will not run if the box is not
+ * in contact with the board. This chan be checked via the macro-defined
+ * function SS_OPEN() */
+static void setup_safety_switch(void)  {
+   SS_PORT.DIRCLR = SS_PIN_bm;
+   PORTCFG.MPCMASK = SS_PIN_bm;
+   SS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc;
+}
+
+/** \brief Initializes the pressure sensor library.
+ *
+ * This allows for easy interfacing with the sensor through the PS_* library
+ * calls.
+ *
+ * \param[in] pressure_sensor The pressure sensor to initialize */
+static void setup_pressure_sensor(PS_t *pressure_sensor) {
+   PS_init(pressure_sensor);
+}
 
 /** \brief Sets up the USART connection with the Board Controller.
  *
@@ -144,23 +157,25 @@ static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator) {
  *
  * \return never returns, test loop runs ad infinitum. */
 int main(void) {
-   uint8_t switch_mask = PIN6_bm;
+   PC_t machine;
+   uint8_t switch_mask = 0x00;
 
-   int16_t position = 0;
-   int16_t steps = 1000;
-   uint16_t accel = 100;
-   uint16_t decel = 100;
-   uint16_t speed = 800;
+   int16_t steps1 = 1000;
+   int16_t steps2 = 1000;
+   uint16_t accel1 = 100;
+   uint16_t accel2 = 100;
+   uint16_t decel1 = 100;
+   uint16_t decel2 = 100;
+   uint16_t speed1 = 800;
+   uint16_t speed2 = 800;
 
-   uint8_t y_ndx, x_ndx;
-   uint8_t dummy_data = 0;
-
-   PS_t pressure_sensor;
+   uint16_t delay_ndx = 0;
 
    LA_t LA_needle;
    LA_t LA_ring;
 
    command_t command;
+   bool info_shown = false;
    uint16_t steps_left = 0;
 
    /* call all of the setup_* functions */
@@ -168,24 +183,120 @@ int main(void) {
    setup_clocks();
    setup_LEDs();
    setup_switches(switch_mask);
-   setup_pressure_sensor(&pressure_sensor);
+   setup_safety_switch();
+   setup_pressure_sensor(&machine.pressure_sensor);
    setup_USART_BC();
-   setup_linear_actuators(&LA_needle, &LA_ring);
+   setup_linear_actuators(&machine.needle_carriage,
+                          &machine.retaining_ring);
+   set_state(&machine, IDLE);
    sei();
 
    /* shows the help menu */
    show_help_message();
 
    /* show the current state of the linear actuator */
-   show_motor_data(position, accel, decel, speed, steps);
+   show_motor_data(LA_get_position(&machine.needle_carriage),
+                   accel1, decel1, speed1, steps1);
+   show_motor_data(LA_get_position(&machine.retaining_ring),
+                   accel2, decel2, speed2, steps2);
 
    while (1) {
-      PS_calibrate(&pressure_sensor);
-      PS_scan_all(&pressure_sensor);
-      PS_print_scan_buffer(&pressure_sensor);
+
+      switch(get_state(&machine)) {
+
+         case IDLE:
+            if (!info_shown){
+               show_motor_data(LA_get_position(&machine.needle_carriage),
+                               accel1, decel1, speed1, steps1);
+               show_motor_data(LA_get_position(&machine.retaining_ring),
+                               accel2, decel2, speed2, steps2);
+               printf("Ready for command\n");
+               info_shown = true;
+            }
+            command = parse_command(&steps1, &accel1, &decel1, &speed1,
+                                    &steps2, &accel2, &decel2, &speed2);
+
+            switch(command) {
+               case STEP2:
+               case MOVE2:
+                  LA_move(&machine.retaining_ring, steps2, accel2, decel2,
+                          speed2);
+                  info_shown = false;
+                  break;
+
+               case STEP1:
+               case MOVE1:
+                  LA_move(&machine.needle_carriage, steps1, accel1, decel1,
+                          speed1);
+                  info_shown = false;
+                  break;
+
+               case ACCEL1:
+               case DECEL1:
+               case SPEED1:
+               case ACCEL2:
+               case DECEL2:
+               case SPEED2:
+                  info_shown = false;
+                  break;
+
+               case CAL:
+                  PS_calibrate(&machine.pressure_sensor);
+                  PS_print_compensation_buffer(&machine.pressure_sensor);
+                  break;
+
+               case SCAN:
+                  PS_scan_all(&machine.pressure_sensor);
+                  PS_print_scan_buffer(&machine.pressure_sensor);
+                  break;
+
+               case HELP:
+                  show_help_message();
+                  info_shown = false;
+                  break;
+
+               default: // do nothing, also catches none command
+                  break;
+
+            }
+            break;
+
+            /*    case RETAIN: */
+
+            /*          break; */
+
+            /*    case ENGAGE: */
+
+            /*       break; */
+
+            /*    case DETECT: */
+
+            /*       break; */
+
+            /*    case DISENGAGE: */
+
+            /*       break; */
+
+            /*    case RELEASE: */
+
+            /*       break; */
+
+            /*    case PASS: */
+
+            /*       break; */
+
+            /*    case STOP: */
+
+            /*       break; */
+
+      }
+
+
+
 
       /*  */
-      /*       switch(command = parse_command(&steps, &accel, &decel, &speed))
+      /*       switch(command = parse_command(&steps, &accel, &decel,
+       *       &speed))
        *       { */
       /*  */
       /*          case STEP: */
@@ -235,23 +346,39 @@ int main(void) {
       /*                printf("motors parked\n"); */
       /*             } */
       /*             if (steps > 0) { */
-      /*                steps_left = (int32_t)steps * SPR / LA_needle.pitch */
+      /*                steps_left = (int32_t)steps * SPR
+       *                / LA_needle.pitch */
       /*                   - LA_needle.motor.speed_ramp.step_count; */
       /*             } */
       /*             else { */
-      /*                steps_left = -1 * (int32_t)steps * SPR / LA_needle.pitch
+      /*                steps_left = -1 * (int32_t)steps * SPR
+       *                / LA_needle.pitch
        *                */
       /*                   - LA_needle.motor.speed_ramp.step_count; */
       /*             } */
-      /*             printf("    Running... Steps Left: %d\n", steps_left); */
+      /*             printf("    Running... Steps Left: %d\n",
+       *             steps_left); */
       /*             delay_ms(250); */
       /*          } */
       /*  */
       /*          printf("    Done with command\n"); */
       /*  */
-      /*          show_motor_data(position, accel, decel, speed, steps); */
+      /*          show_motor_data(position, accel, decel, speed, steps);
+       *          */
       /*       } */
    }//end while (1)
+}
+
+/** \brief Sets the new state of the machine.
+ *
+ * Convenience method for setting the state of the machine to a new state. Not
+ * implemented as a a macro so we ca force the compiler to type check the
+ * parameters.
+ *
+ * \param[in] machine The machine to set the state
+ * \param[in] state The new state to set */
+INLINE void set_state(PC_t *machine, PC_STATE_t state) {
+   machine->state = state;
 }
 
 /*! \brief Sends help message.
@@ -281,8 +408,10 @@ static void show_motor_data(int16_t position, uint16_t acceleration,
 }
 
 
-static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
-                               uint16_t *speed) {
+static command_t parse_command(int16_t *steps1, uint16_t *accel1,
+                               uint16_t *decel1, uint16_t *speed1,
+                               int16_t *steps2, uint16_t *accel2,
+                               uint16_t *decel2, uint16_t *speed2) {
    char command_buffer[USART_RX_BUFFER_SIZE];
    command_t command = NONE;
    uint8_t command_ndx = 0;
@@ -293,31 +422,73 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
       if (command_buffer[command_ndx] == 'm') {
          ++command_ndx;
          // Move with...
-         if (command_buffer[command_ndx++] == ' '){
-            // ...number of steps given.
-            *steps = atoi((const char *)command_buffer+2);
-            command = STEP;
+         if (command_buffer[command_ndx] == '1') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' '){
+               // ...number of steps given.
+               *steps1 = atoi((const char *)command_buffer+command_ndx);
+               command = STEP1;
+            }
+         }
+         else if (command_buffer[command_ndx] == '2') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' '){
+               // ...number of steps given.
+               *steps2 = atoi((const char *)command_buffer+command_ndx);
+               command = STEP2;
+            }
          }
          else if (command_buffer[command_ndx++] == 'o'){
             if (command_buffer[command_ndx++] == 'v'){
                if (command_buffer[command_ndx++] == 'e'){
                   // ...all parameters given
-                  if (command_buffer[command_ndx++] == ' '){
-                     *steps = atoi((const char *)command_buffer+command_ndx);
+                  if (command_buffer[command_ndx] == '1') {
+                     ++command_ndx;
+                     if (command_buffer[command_ndx++] == ' ') {
+                        *steps1 =
+                           atoi((const char *)command_buffer+command_ndx);
 
-                     command_ndx =
-                        find_next_param(command_buffer, ++command_ndx);
-                     *accel = atoi((const char *)command_buffer+command_ndx);
+                        command_ndx =
+                           find_next_param(command_buffer, ++command_ndx);
+                        *accel1 =
+                           atoi((const char *)command_buffer+command_ndx);
 
-                     command_ndx =
-                        find_next_param(command_buffer, ++command_ndx);
-                     *decel = atoi((const char *)command_buffer+command_ndx);
+                        command_ndx =
+                           find_next_param(command_buffer, ++command_ndx);
+                        *decel1 =
+                           atoi((const char *)command_buffer+command_ndx);
 
-                     command_ndx =
-                        find_next_param(command_buffer, ++command_ndx);
-                     *speed = atoi((const char *)command_buffer+command_ndx);
+                        command_ndx =
+                           find_next_param(command_buffer, ++command_ndx);
+                        *speed1 =
+                           atoi((const char *)command_buffer+command_ndx);
 
-                     command = MOVE;
+                        command = MOVE1;
+                     }
+                  }
+                  else if (command_buffer[command_ndx] == '2') {
+                     ++command_ndx;
+                     if (command_buffer[command_ndx++] == ' ') {
+                        *steps2 =
+                           atoi((const char *)command_buffer+command_ndx);
+
+                        command_ndx =
+                           find_next_param(command_buffer, ++command_ndx);
+                        *accel2 =
+                           atoi((const char *)command_buffer+command_ndx);
+
+                        command_ndx =
+                           find_next_param(command_buffer, ++command_ndx);
+                        *decel2 =
+                           atoi((const char *)command_buffer+command_ndx);
+
+                        command_ndx =
+                           find_next_param(command_buffer, ++command_ndx);
+                        *speed2 =
+                           atoi((const char *)command_buffer+command_ndx);
+
+                        command = MOVE2;
+                     }
                   }
                }
             }
@@ -326,28 +497,61 @@ static command_t parse_command(int16_t *steps, uint16_t *accel, uint16_t *decel,
       else if (command_buffer[command_ndx] == 'a'){
          ++command_ndx;
          // Set acceleration.
-         if (command_buffer[command_ndx++] == ' '){
-            *accel = atoi((const char *)command_buffer+command_ndx);
-            command = ACCEL;
+         if (command_buffer[command_ndx] == '1') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' ') {
+               *accel1 = atoi((const char *)command_buffer+command_ndx);
+               command = ACCEL1;
+            }
+         }
+         else if (command_buffer[command_ndx] == '2') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' '){
+               *accel2 = atoi((const char *)command_buffer+command_ndx);
+               command = ACCEL2;
+            }
          }
       }
       else if (command_buffer[command_ndx] == 'd'){
          ++command_ndx;
          // Set deceleration.
-         if (command_buffer[command_ndx++] == ' '){
-            *decel = atoi((const char *)command_buffer+command_ndx);
-            command = DECEL;
+         if (command_buffer[command_ndx] == '1') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' '){
+               *decel1 = atoi((const char *)command_buffer+command_ndx);
+               command = DECEL1;
+            }
+         }
+         else if (command_buffer[command_ndx] == '2') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' '){
+               *decel2 = atoi((const char *)command_buffer+command_ndx);
+               command = DECEL2;
+            }
          }
       }
-      else if (command_buffer[command_ndx] == 's'){
+      else if (command_buffer[command_ndx] == 's') {
          ++command_ndx;
-         if (command_buffer[command_ndx] == ' '){
-            *speed = atoi((const char *)command_buffer+command_ndx);
-            command = ACCEL;
+         if (command_buffer[command_ndx] == '1') {
+            ++command_ndx;
+            if (command_buffer[command_ndx++] == ' ') {
+               *speed1 = atoi((const char *)command_buffer+command_ndx);
+               command = ACCEL1;
+            }
+         }
+         if (command_buffer[command_ndx++] == '2') {
+            if (command_buffer[command_ndx] == ' ') {
+               ++command_ndx;
+               *speed2 = atoi((const char *)command_buffer+command_ndx);
+               command = ACCEL2;
+            }
          }
       }
-      else if (command_buffer[command_ndx] == '\r'){// hyper terminal sends \r\n
-         command = REPEAT;
+      else if (command_buffer[command_ndx] == 'c'){// hyper terminal sends \r\n
+         command = CAL;
+      }
+      else if (command_buffer[command_ndx] == 'p'){// hyper terminal sends \r\n
+         command = SCAN;
       }
       else if (command_buffer[command_ndx] == '?'){
          command = HELP;

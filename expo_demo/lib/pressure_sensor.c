@@ -252,14 +252,18 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
          /* stay on the same y channel */
          ADC_set_output_data(&adc1, MPy_channels+y_channel);
          result = ADC_sample_once(&adc1);
-         if (comp_buffer) {
-            comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)];
-            if (comp > result) { /* if comp is gt result, save a 0 in buffer */
+         if (comp_buffer != NULL) {
+            comp = comp_buffer[y_channel][x_channel];
+            if (result < ZERO_THRESHOLD) {
+               result = 0;
+               comp = 0;
+            }
+            else if (comp > result) { /* if comp is gt result, set to 0  */
                comp = result;
             }
          }
-         buffer[y_channel][x_channel] = result - comp;
 
+         buffer[y_channel][x_channel] = result - comp;
          if (x_channel == (NUM_PS_X_CHANS / 2) - 1) { /* set x_channel to 0 */
             ADC_reset_channel(&adc0);
          }
@@ -267,9 +271,13 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
             ADC_set_output_data(&adc0, MPx_channels+x_channel+1);
          }
          result = ADC_sample_once(&adc0);
-         if (comp_buffer) {
-            comp = comp_buffer[y_channel][x_channel];
-            if (comp > result) { /* if comp is gt result, save a 0 in buffer */
+         if (comp_buffer != NULL) {
+            comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)];
+            if (result < ZERO_THRESHOLD) {
+               result = 0;
+               comp = 0;
+            }
+            else if (comp > result) { /* if comp is gt result, set to 0  */
                comp = result;
             }
          }
@@ -285,13 +293,22 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
  * \param[in] buffer The pressure sensor scan buffer to print out */
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
    int8_t y_channel, x_channel;
+   uint16_t value;
 
    for (y_channel = 0; y_channel < NUM_PS_Y_CHANS; ++y_channel) {
       printf("\n");
       for (x_channel = 0; x_channel < NUM_PS_X_CHANS ; ++x_channel) {
-         printf("%4u ", buffer[y_channel][x_channel]);
+         value = buffer[y_channel][x_channel];
+
+         if (value > 2048) {
+            printf(" *** ");
+         }
+         else {
+            printf("%4u ", value);
+         }
       }
    }
+   printf("\n");
 }
 
 /** \brief ADC /EOC interrupt vector (PORT.INT0)

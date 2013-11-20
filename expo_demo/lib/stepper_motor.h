@@ -126,6 +126,15 @@
  * \retval SM_RUN the motor is running at max speed */
 #define SM_get_motor_state(_motor) ((_motor)->speed_ramp.run_state)
 
+/** \brief Homes the motor (sets the current position to 0).
+ *
+ * Homing is performed every time the linear actuator hits its limit switch.
+ * However, the home position can additionally be changed by a call to this
+ * function. This resets the current position of the motor to 0.
+ *
+ * \param[in] _motor pointer to the motor to home  */
+#define SM_home(_motor) ((_motor)->position = 0)
+
 ///@}
 
 /* Typedefs, Enums, and Structs ***********************************************/
@@ -178,6 +187,7 @@ typedef struct stepper_motor_driver  {
    uint8_t DISABLE_bm;   ///< DISABLE pin bm
    uint8_t DIRECTION_bm; ///< DIRECTION pin bm
    uint8_t STEP_bm;      ///< STEP pin bm
+   int16_t position;     ///< angular position of motor
    SM_SRD_t speed_ramp;  ///< Speed ramp static data struct
    SM_timer_t timer;     ///< which timer to use for this motor (TIMER0, TIMER1)
 } SM_t;
@@ -190,11 +200,13 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
              uint8_t DIRECTION_bm, uint8_t STEP_bm, SM_timer_t timer);
 ///@}
 
-void SM_move(SM_t *motor,
-             int16_t steps, uint16_t accel, uint16_t decel, uint16_t speed);
 void SM_enable(SM_t *motor);
 void SM_disable(SM_t *motor);
 void SM_brake(SM_t *motor);
+void SM_move(SM_t *motor,
+             int16_t steps, uint16_t accel, uint16_t decel, uint16_t speed);
+int16_t SM_get_position(SM_t *motor);
+
 
 
 #endif /* end of include guard: _STEPPER_MOTOR_H_ */

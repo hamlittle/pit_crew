@@ -91,6 +91,8 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
    motor->STEP_bm = STEP_bm;
    motor->timer = timer;
 
+   SM_home(motor);
+
    /* initialize IO pins */
    port->OUTSET = DIRECTION_bm; // set dir high as default
    port->OUTCLR = DISABLE_bm | STEP_bm;
@@ -99,6 +101,55 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
    SM_timer_init(motor, timer); // Must come first, as brake modifies the timer
    SM_brake(motor); // handles setting the speed_ramp field to defaults
    SM_limit_switch_init(); // set up the limit switches
+}
+
+/** \brief Enables the stepper motor driver.
+ *
+ * Pulls the DISABLE pin low to enable the stepper motor driver. Any moves which
+ * were occurring when the motor was disabled have been cancelled; this
+ * function will not reinitiate a cancelled move.
+ *
+ * \param[in] motor the motor to enable (pull DISABLE low) */
+void SM_enable(SM_t *motor) {
+   motor->port->OUTCLR = motor->DISABLE_bm;
+}
+
+/** \brief Disables the stepper motor driver.
+ *
+ * Drives the DISABLE hi to disable the stepper motor driver. Additionally,
+ * any moves which are ongoing will be cancelled. A cancelled move cannot be
+ * reinitiated.
+ *
+ * Disabling is different from braking in that this function disables the
+ * stepper motor driver, allowing the motor to freewheel (although spinning the
+ * motor while it is connected to the stepper driver may fry the driver). When
+ * the stepper motor is parked, via a call to SM_brake(), the current movement
+ * will be canceled, and the full holding torque output of the motor is being
+ * applied. However, the motor will be ready for a new movement at any time
+ * while in the parked state, whereas the motor must be reenabled through a call
+ * to SM_enable if it has been disabled before a new movement can be initiated.
+ *
+ * \param[in] motor the motor to disable (pull /DISABLE hi) */
+void SM_disable(SM_t *motor) {
+   SM_brake(motor);                         // stop motor, cancel move
+   motor->port->OUTSET = motor->DISABLE_bm; // disable the driver
+}
+
+/** \brief Parks the motor in its current position.
+ *
+ * This is the default motor state while it is waiting for a new movement to be
+ * initiated. The park function is implemented here so that an ongoing movement
+ * can be cancelled immediately.
+ *
+ * In the parked state, the motor is outputting its full holding torque to
+ * maintain its current position. Note that momentum in the motor may cause it
+ * to move past the location it was when when the brake was initiated; this is
+ * a powered brake, not an emergency brake;
+ *
+ * \param[in] motor the motor to brake */
+void SM_brake(SM_t *motor) {
+   SM_timer_stop(motor->timer);              // stop the motor
+   SM_speed_ramp_init(&(motor->speed_ramp)); // reset speed ramp, cancels move
 }
 
 /** \brief Move the stepper motor a given number of steps.
@@ -217,53 +268,16 @@ void SM_move(SM_t *motor,
    }
 }
 
-/** \brief Enables the stepper motor driver.
+/** \brief Returns the motor's position.
  *
- * Pulls the DISABLE pin low to enable the stepper motor driver. Any moves which
- * were occurring when the motor was disabled have been cancelled; this
- * function will not reinitiate a cancelled move.
+ * The position is in the number of steps the motor has turned since it was
+ * last homed.
  *
- * \param[in] motor the motor to enable (pull DISABLE low) */
-void SM_enable(SM_t *motor) {
-   motor->port->OUTCLR = motor->DISABLE_bm;
-}
-
-/** \brief Disables the stepper motor driver.
+ * \param[in] motor The motor whose position to get
  *
- * Drives the DISABLE hi to disable the stepper motor driver. Additionally,
- * any moves which are ongoing will be cancelled. A cancelled move cannot be
- * reinitiated.
- *
- * Disabling is different from braking in that this function disables the
- * stepper motor driver, allowing the motor to freewheel (although spinning the
- * motor while it is connected to the stepper driver may fry the driver). When
- * the stepper motor is parked, via a call to SM_brake(), the current movement
- * will be canceled, and the full holding torque output of the motor is being
- * applied. However, the motor will be ready for a new movement at any time
- * while in the parked state, whereas the motor must be reenabled through a call
- * to SM_enable if it has been disabled before a new movement can be initiated.
- *
- * \param[in] motor the motor to disable (pull /DISABLE hi) */
-void SM_disable(SM_t *motor) {
-   SM_brake(motor);                         // stop motor, cancel move
-   motor->port->OUTSET = motor->DISABLE_bm; // disable the driver
-}
-
-/** \brief Parks the motor in its current position.
- *
- * This is the default motor state while it is waiting for a new movement to be
- * initiated. The park function is implemented here so that an ongoing movement
- * can be cancelled immediately.
- *
- * In the parked state, the motor is outputting its full holding torque to
- * maintain its current position. Note that momentum in the motor may cause it
- * to move past the location it was when when the brake was initiated; this is
- * a powered brake, not an emergency brake;
- *
- * \param[in] motor the motor to brake */
-void SM_brake(SM_t *motor) {
-   SM_timer_stop(motor->timer);              // stop the motor
-   SM_speed_ramp_init(&(motor->speed_ramp)); // reset speed ramp, cancels move
+ * \return The motor's position in steps from last home */
+int16_t SM_get_position(SM_t *motor) {
+   return motor->position;
 }
 
 /* Internal Function Definitions **********************************************/
@@ -336,10 +350,12 @@ static void SM_timer_OVF_handler(SM_t *motor) {
    if (motor->speed_ramp.direction == SM_RETRACT) {
       if ((motor == needle_motor) && (LS_PORT.IN & LS_NEEDLE_PIN_bm)) {
          SM_brake(motor);
+         SM_home(motor);
          printf("Needle Carriage Homed");
       }
       else if ((motor == ring_motor) && (LS_PORT.IN & LS_RING_PIN_bm)) {
          SM_brake(motor);
+         SM_home(motor);
          printf("Retaining Ring Homed\n");
       }
    }
@@ -508,8 +524,17 @@ void SM_step(SM_t *motor) {
 
    /* step once */
    port->OUTCLR = STEP_bm;
+
+   if (motor->speed_ramp.direction == SM_ENGAGE) {
+      ++(motor->position);
+   }
+   else {
+      --(motor->position);
+   }
+
    delay_us(2);
    port->OUTSET = STEP_bm;
+
 }
 
 /** \brief Square root routine.

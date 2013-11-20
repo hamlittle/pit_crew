@@ -80,6 +80,9 @@
 #define NUM_PS_X_CHANS 28 ///< Number of x-position channels
 #define NUM_PS_Y_CHANS 24 ///< Number of y-position channels
 
+/// any reading, after compensated, less than this threshold is set to 0
+#define ZERO_THRESHOLD 300
+
 /* Typedefs, Enums, and Structs ***********************************************/
 
 /** \brief Contains the static data needed to interface with the pressure
