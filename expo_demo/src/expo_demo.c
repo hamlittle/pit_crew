@@ -184,10 +184,10 @@ int main(void) {
    setup_LEDs();
    setup_switches(switch_mask);
    setup_safety_switch();
-   setup_pressure_sensor(&machine.pressure_sensor);
+   setup_pressure_sensor(&(machine.pressure_sensor));
    setup_USART_BC();
-   setup_linear_actuators(&machine.needle_carriage,
-                          &machine.retaining_ring);
+   setup_linear_actuators(&(machine.needle_carriage),
+                          &(machine.retaining_ring));
    set_state(&machine, IDLE);
    sei();
 
@@ -195,9 +195,9 @@ int main(void) {
    show_help_message();
 
    /* show the current state of the linear actuator */
-   show_motor_data(LA_get_position(&machine.needle_carriage),
+   show_motor_data(LA_get_position(&(machine.needle_carriage)),
                    accel1, decel1, speed1, steps1);
-   show_motor_data(LA_get_position(&machine.retaining_ring),
+   show_motor_data(LA_get_position(&(machine.retaining_ring)),
                    accel2, decel2, speed2, steps2);
 
    while (1) {
@@ -206,9 +206,9 @@ int main(void) {
 
          case IDLE:
             if (!info_shown){
-               show_motor_data(LA_get_position(&machine.needle_carriage),
+               show_motor_data(LA_get_position(&(machine.needle_carriage)),
                                accel1, decel1, speed1, steps1);
-               show_motor_data(LA_get_position(&machine.retaining_ring),
+               show_motor_data(LA_get_position(&(machine.retaining_ring)),
                                accel2, decel2, speed2, steps2);
                printf("Ready for command\n");
                info_shown = true;
@@ -241,13 +241,13 @@ int main(void) {
                   break;
 
                case CAL:
-                  PS_calibrate(&machine.pressure_sensor);
-                  PS_print_compensation_buffer(&machine.pressure_sensor);
+                  PS_calibrate(&(machine.pressure_sensor));
+                  PS_print_compensation_buffer(&(machine.pressure_sensor));
                   break;
 
                case SCAN:
-                  PS_scan_all(&machine.pressure_sensor);
-                  PS_print_scan_buffer(&machine.pressure_sensor);
+                  PS_scan_all(&(machine.pressure_sensor));
+                  PS_print_scan_buffer(&(machine.pressure_sensor));
                   break;
 
                case HELP:

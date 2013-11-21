@@ -60,7 +60,7 @@
  * transferred. The same goes for MPx_channel[1] to select channel 1, as 0x11
  * is the second byte transferred, and so on, for every channel on MPx0 and
  * MPx1. */
-static const uint8_t MPx_channels[(NUM_PS_X_CHANS / 2) + 1] =
+const uint8_t MPx_channels[(NUM_PS_X_CHANS / 2) + 1] =
 { 0x00,
    0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77,
    0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00 };
@@ -86,7 +86,7 @@ static const uint8_t MPx_channels[(NUM_PS_X_CHANS / 2) + 1] =
  * transferred. The same goes for MPx_channel[1] to select channel 1, as 0x11
  * is the second byte transferred, and so on, for every channel on MPy0 and
  * MPy1. */
-static const uint8_t MPy_channels[NUM_PS_Y_CHANS + 1] =
+const uint8_t MPy_channels[NUM_PS_Y_CHANS + 1] =
 { 0x00,
    0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F, 0x8F, 0x9F, 0xAF, 0xBF,
    0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB };
@@ -114,6 +114,8 @@ volatile ADC_sel_t current_ADC;
 static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
                          uint16_t comp_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]);
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]);
+static uint16_t get_min(uint16_t *oversample_buffer);
+static uint16_t get_max(uint16_t *oversample_buffer);
 
 /* Function Definitions * *****************************************************/
 
@@ -234,8 +236,12 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
 static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
                          uint16_t comp_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
    uint8_t y_channel, x_channel;
+   uint16_t oversample_buffer[OVERSAMPLE_SIZE];
    uint16_t result;
    uint16_t comp = 0;
+   uint16_t min;
+   uint16_t max;
+   uint8_t oversample_ndx;
 
    /* start at position 0,0 */
    ADC_reset_channel(&adc0);
@@ -248,40 +254,63 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
       ADC_sample_once(&adc1);
 
       for (x_channel = 0; x_channel < (NUM_PS_X_CHANS / 2); ++x_channel) {
+         /* set the x_channel, but dont use the conversion result */
+         ADC_set_output_data(&adc0, MPx_channels+x_channel);
+         ADC_sample_once(&adc0);
 
          /* stay on the same y channel */
          ADC_set_output_data(&adc1, MPy_channels+y_channel);
-         result = ADC_sample_once(&adc1);
-         if (comp_buffer != NULL) {
-            comp = comp_buffer[y_channel][x_channel];
-            if (result < ZERO_THRESHOLD) {
-               result = 0;
-               comp = 0;
-            }
-            else if (comp > result) { /* if comp is gt result, set to 0  */
-               comp = result;
-            }
+         for (oversample_ndx = 0; oversample_ndx < OVERSAMPLE_SIZE;
+              ++oversample_ndx) {
+            oversample_buffer[oversample_ndx] = ADC_sample_once(&adc1);
+         }
+         min = get_min(oversample_buffer);
+         max = get_max(oversample_buffer);
+         if ((max - min > OVERSAMPLE_THRESHOLD) && (comp_buffer != NULL)) {
+            result = 0;
+         }
+         else {
+            result = (max+min)/2;
          }
 
-         buffer[y_channel][x_channel] = result - comp;
-         if (x_channel == (NUM_PS_X_CHANS / 2) - 1) { /* set x_channel to 0 */
-            ADC_reset_channel(&adc0);
-         }
-         else { /* increase to the next mpx channel */
-            ADC_set_output_data(&adc0, MPx_channels+x_channel+1);
-         }
-         result = ADC_sample_once(&adc0);
          if (comp_buffer != NULL) {
-            comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)];
-            if (result < ZERO_THRESHOLD) {
-               result = 0;
-               comp = 0;
-            }
-            else if (comp > result) { /* if comp is gt result, set to 0  */
+            comp = comp_buffer[y_channel][x_channel]
+               + ZERO_THRESHOLD;
+            if (comp > result) { /* if comp is gt result, set to 0  */
                comp = result;
             }
          }
-         buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)] = result - comp;
+         if (result & SIGN_BIT) {
+            result = 0;
+            comp = 0;
+         }
+         buffer[y_channel][x_channel] = result-comp;
+
+         for (oversample_ndx = 0; oversample_ndx < OVERSAMPLE_SIZE;
+              ++oversample_ndx) {
+            oversample_buffer[oversample_ndx] = ADC_sample_once(&adc0);
+         }
+         min = get_min(oversample_buffer);
+         max = get_max(oversample_buffer);
+         if ((max - min > OVERSAMPLE_THRESHOLD) && (comp_buffer != NULL)) {
+            result = 0;
+         }
+         else {
+            result = (max+min)/2;
+         }
+
+         if (comp_buffer != NULL) {
+            comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)]
+               + ZERO_THRESHOLD;
+            if (comp > result) { /* if comp is gt result, set to 0  */
+               comp = result;
+            }
+         }
+         if (result & SIGN_BIT) {
+            result = 0;
+            comp = 0;
+         }
+         buffer[y_channel][x_channel + (NUM_PS_X_CHANS)/2] = result-comp;
       }
    }
 }
@@ -293,22 +322,39 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
  * \param[in] buffer The pressure sensor scan buffer to print out */
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
    int8_t y_channel, x_channel;
-   uint16_t value;
 
    for (y_channel = 0; y_channel < NUM_PS_Y_CHANS; ++y_channel) {
       printf("\n");
       for (x_channel = 0; x_channel < NUM_PS_X_CHANS ; ++x_channel) {
-         value = buffer[y_channel][x_channel];
-
-         if (value > 2048) {
-            printf(" *** ");
-         }
-         else {
-            printf("%4u ", value);
-         }
+         printf("%4u ", buffer[y_channel][x_channel]);
       }
    }
-   printf("\n");
+}
+
+static uint16_t get_min(uint16_t *oversample_buffer) {
+   uint16_t min = *oversample_buffer;
+   uint8_t ndx;
+
+   for (ndx = 0; ndx < OVERSAMPLE_SIZE-1; ++ndx) {
+      if (*(oversample_buffer+ndx+1) < *(oversample_buffer+ndx)) {
+         min = *(oversample_buffer+ndx+1);
+      }
+   }
+
+   return min;
+}
+
+static uint16_t get_max(uint16_t *oversample_buffer) {
+   uint16_t max = *oversample_buffer;
+   uint8_t ndx;
+
+   for (ndx = 0; ndx < OVERSAMPLE_SIZE-1; ++ndx) {
+      if (*(oversample_buffer+ndx+1) > *(oversample_buffer+ndx)) {
+         max = *(oversample_buffer+ndx+1);
+      }
+   }
+
+   return max;
 }
 
 /** \brief ADC /EOC interrupt vector (PORT.INT0)

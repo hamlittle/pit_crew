@@ -81,7 +81,11 @@
 #define NUM_PS_Y_CHANS 24 ///< Number of y-position channels
 
 /// any reading, after compensated, less than this threshold is set to 0
-#define ZERO_THRESHOLD 300
+#define ZERO_THRESHOLD 100
+#define OVERSAMPLE_SIZE 10
+#define OVERSAMPLE_THRESHOLD 10
+
+#define SIGN_BIT (0x0001 << 11)
 
 /* Typedefs, Enums, and Structs ***********************************************/
 
