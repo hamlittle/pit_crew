@@ -90,8 +90,8 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
    motor->DIRECTION_bm = DIRECTION_bm;
    motor->STEP_bm = STEP_bm;
    motor->timer = timer;
+   motor->position = 30000; // so the motors can be homed on initialization
 
-   SM_home(motor);
 
    /* initialize IO pins */
    port->OUTSET = DIRECTION_bm; // set dir high as default
@@ -174,6 +174,7 @@ void SM_move(SM_t *motor,
    uint16_t accel_lim;
 
    SM_SRD_t *speed_ramp = &(motor->speed_ramp);
+
 
    // set the running flag is we are starting the needle carriage  motor
    if (motor == needle_motor) {
@@ -286,6 +287,9 @@ int16_t SM_get_position(SM_t *motor) {
  *
  * Sets all the values of the speed ramp to defaults, so that the motor starts
  * in a known state
+ *
+ * \note This does not initialize the position of the motor. This must be done
+ * with a call to SM_home().
  *
  * \param[in] speed_ramp the speed ramp to initialize */
 static void SM_speed_ramp_init(SM_SRD_t *speed_ramp) {
@@ -532,9 +536,26 @@ void SM_step(SM_t *motor) {
       --(motor->position);
    }
 
-   delay_us(2);
-   port->OUTSET = STEP_bm;
+   // check they won't run into each other
+   if ((motor->speed_ramp.direction == SM_ENGAGE) && (motor == needle_motor)) {
+      if ((int32_t)motor->position*LA_NEEDLE_PITCH/SPR
+          > (int32_t)ring_motor->position*LA_RING_PITCH/SPR + SM_OFFSET) {
+         SM_brake(motor);
+         printf("\nABORTING: This move would cause the needle carriage to "
+                "collide with the retaining_ring\n");
+      }
+   }
+   else if ((motor->speed_ramp.direction==SM_RETRACT) && (motor==ring_motor)) {
+      if ((int32_t)motor->position*LA_RING_PITCH/SPR
+          < (int32_t)needle_motor->position*LA_NEEDLE_PITCH/SPR - SM_OFFSET) {
+         SM_brake(motor);
+         printf("\nABORTING: This move would cause the needle carriage to "
+                "collide with the retaining_ring\n");
+      }
+   }
 
+   delay_us(1);
+   port->OUTSET = STEP_bm;
 }
 
 /** \brief Square root routine.

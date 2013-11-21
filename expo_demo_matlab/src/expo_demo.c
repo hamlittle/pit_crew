@@ -170,13 +170,13 @@ int main(void) {
    uint16_t speed2 = 800;
 
    uint16_t delay_ndx = 0;
+   uint8_t frame_ndx;
+   uint8_t frames = 10;
 
-   LA_t LA_needle;
-   LA_t LA_ring;
+   bool move_made = false;
 
    command_t command;
-   bool info_shown = false;
-   uint16_t steps_left = 0;
+   bool matlab = false;
 
    /* call all of the setup_* functions */
    cli();
@@ -200,35 +200,58 @@ int main(void) {
    show_motor_data(LA_get_position(&(machine.retaining_ring)),
                    accel2, decel2, speed2, steps2);
 
+   PS_calibrate(&machine.pressure_sensor);
+
+   LA_go_to_home(&machine.needle_carriage);
+   LA_go_to_home(&machine.retaining_ring);
+
    while (1) {
 
-      switch(get_state(&machine)) {
+      if (SS_OPEN()) {
+         set_state(&machine, STOP);
+      }
+
+      switch (get_state(&machine)) {
 
          case IDLE:
-            if (!info_shown){
-               show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                               accel1, decel1, speed1, steps1);
-               show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                               accel2, decel2, speed2, steps2);
-               printf("Ready for command\n");
-               info_shown = true;
-            }
             command = parse_command(&steps1, &accel1, &decel1, &speed1,
                                     &steps2, &accel2, &decel2, &speed2);
+            matlab = false;
 
             switch(command) {
+               case RUN_MATLAB:
+                  matlab = true;
+                  printf("movie_begin\n");
+               case RUN:
+                  printf("Beginning system run\n");
+                  set_state(&machine, ENGAGE);
+                  move_made = false;
+                  break;
+
+               case HOME:
+                  LA_go_to_home(&machine.needle_carriage);
+                  LA_go_to_home(&machine.retaining_ring);
+                  printf("\n>");
+                  break;
+
+               case BRAKE:
+                  LA_brake(&machine.needle_carriage);
+                  LA_brake(&machine.retaining_ring);
+                  printf("\n>");
+                  break;
+
                case STEP2:
                case MOVE2:
                   LA_move(&machine.retaining_ring, steps2, accel2, decel2,
                           speed2);
-                  info_shown = false;
+                  printf("\n>");
                   break;
 
                case STEP1:
                case MOVE1:
                   LA_move(&machine.needle_carriage, steps1, accel1, decel1,
                           speed1);
-                  info_shown = false;
+                  printf("\n>");
                   break;
 
                case ACCEL1:
@@ -237,22 +260,28 @@ int main(void) {
                case ACCEL2:
                case DECEL2:
                case SPEED2:
-                  info_shown = false;
+                  printf("\n>");
                   break;
 
                case CAL:
                   PS_calibrate(&(machine.pressure_sensor));
                   PS_print_compensation_buffer(&(machine.pressure_sensor));
+                  printf("\n>");
                   break;
 
                case SCAN:
                   PS_scan_all(&(machine.pressure_sensor));
                   PS_print_scan_buffer(&(machine.pressure_sensor));
+                  printf("\n>");
                   break;
 
                case HELP:
                   show_help_message();
-                  info_shown = false;
+                  show_motor_data(LA_get_position(&(machine.needle_carriage)),
+                                  accel1, decel1, speed1, steps1);
+                  show_motor_data(LA_get_position(&(machine.retaining_ring)),
+                                  accel2, decel2, speed2, steps2);
+                  printf("\n>");
                   break;
 
                default: // do nothing, also catches none command
@@ -261,117 +290,117 @@ int main(void) {
             }
             break;
 
-            /*    case RETAIN: */
+         case RETAIN:
+            printf("Retaining peach\n");
+            break;
 
-            /*          break; */
+         case ENGAGE:
+            if (!move_made) {
+               printf("Engaging Needles\n");
+               LA_move(&machine.needle_carriage,
+                       LA_get_position(&machine.retaining_ring) - LA_OFFSET,
+                       LA_NEEDLE_ENGAGE_ACCEL, LA_NEEDLE_ENGAGE_DECEL,
+                       LA_NEEDLE_ENGAGE_SPEED);
+               move_made = true;
+            }
 
-            /*    case ENGAGE: */
+            if (LA_get_position(&machine.needle_carriage) !=
+                LA_get_position(&machine.retaining_ring)-LA_OFFSET) {
 
-            /*       break; */
+               if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
+                                 &accel2, &decel2, &speed2) == BRAKE) {
 
-            /*    case DETECT: */
+                  set_state(&machine, STOP);
+               }
+            }
+            else {
+               set_state(&machine, CHECK);
+               move_made = false;
+            }
+            break;
 
-            /*       break; */
+         case CHECK:
+            PS_calibrate(&machine.pressure_sensor);
 
-            /*    case DISENGAGE: */
+            if (!move_made) {
+               printf("Checking Peach\n");
+               if (matlab) {
+                  LA_move(&machine.needle_carriage,
+                          LA_NEEDLE_CHECK_DEPTH, LA_NEEDLE_CHECK_ACCEL_SLOW,
+                          LA_NEEDLE_CHECK_DECEL_SLOW,
+                          LA_NEEDLE_CHECK_SPEED_SLOW);
+               }
+               else {
+                  LA_move(&machine.needle_carriage,
+                          LA_NEEDLE_CHECK_DEPTH, LA_NEEDLE_CHECK_ACCEL,
+                          LA_NEEDLE_CHECK_DECEL, LA_NEEDLE_CHECK_SPEED);
+               }
+               move_made = true;
+            }
 
-            /*       break; */
+            if (LA_get_position(&machine.needle_carriage) !=
+                LA_get_position(&machine.retaining_ring)
+                - LA_OFFSET + LA_NEEDLE_CHECK_DEPTH) {
 
-            /*    case RELEASE: */
+               if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
+                                 &accel2, &decel2, &speed2) == BRAKE) {
 
-            /*       break; */
+                  set_state(&machine, STOP);
+               }
+               else {
+                  PS_scan_all(&machine.pressure_sensor);
 
-            /*    case PASS: */
+                  if (PS_check(&machine.pressure_sensor, PS_THRESHOLD)) {
+                     set_state(&machine, DISENGAGE);
+                     printf("\n\n\n\n   !!!!!!PIT!!!!!!\n\n\n\n");
+                     break;
+                  }
+                  if (matlab) {
+                     printf("pressure_sensor_begin\n");
+                     PS_print_scan_buffer(&machine.pressure_sensor);
+                     printf("pressure_sensor_end\n");
+                  }
+               }
+            }
+            else {
+               set_state(&machine, DISENGAGE);
+               printf("\n\n\n\n             NO PIT\n\n\n\n");
+            }
+            break;
 
-            /*       break; */
+         case DISENGAGE:
+            if (matlab) {
+               printf("movie_end\n");
+            }
+            printf("Disengaging Needles\n");
+            LA_go_to_home(&machine.needle_carriage);
+            set_state(&machine, IDLE);
+            break;
 
-            /*    case STOP: */
+         case RELEASE:
+            printf("Releasing Peach\n");
+            break;
 
-            /*       break; */
+         case PASS:
+            printf("Passing/Rejecting Peach\n");
+            break;
+
+         case STOP:
+            printf("Machine Stopped\n");
+            LA_brake(&machine.needle_carriage);
+            LA_brake(&machine.retaining_ring);
+            set_state(&machine, IDLE);
+            break;
 
       }
 
-
-
-
-      /*  */
-      /*       switch(command = parse_command(&steps, &accel, &decel,
-       *       &speed))
-       *       { */
-      /*  */
-      /*          case STEP: */
-      /*             LA_move(&LA_needle, steps, accel, decel, speed); */
-      /*             LA_move(&LA_ring, steps, accel, decel, speed); */
-      /*             position += steps; */
-      /*             printf("\n\n"); */
-      /*             break; */
-      /*  */
-      /*          case MOVE: */
-      /*             LA_move(&LA_needle, steps, accel, decel, speed); */
-      /*             LA_move(&LA_ring, steps, accel, decel, speed); */
-      /*             position += steps; */
-      /*             printf("\n\n"); */
-      /*             break; */
-      /*  */
-      /*          case ACCEL: */
-      /*          case DECEL: */
-      /*          case SPEED: */
-      /*             printf("\n\n"); */
-      /*             break; */
-      /*  */
-      /*          case REPEAT: */
-      /*             LA_move(&LA_needle, steps, accel, decel, speed); */
-      /*             LA_move(&LA_ring, steps, accel, decel, speed); */
-      /*             position += steps; */
-      /*             printf("\n\n"); */
-      /*             break; */
-      /*  */
-      /*          case HELP: */
-      /*             show_help_message(); */
-      /*             break; */
-      /*  */
-      /*          case NONE: */
-      /*             break; */
-      /*  */
-      /*          default: */
-      /*             show_help_message(); */
-      /*             break; */
-      /*       } */
-      /*  */
-      /*       if ((command != HELP) && (command != NONE)) { */
-      /*          while (LA_get_motor_state(&LA_needle) != SM_STOP) { */
-      /*             if (READ_SWITCHES & PIN6_bm) { */
-      /*                LA_brake(&LA_needle); */
-      /*                LA_brake(&LA_ring); */
-      /*                printf("motors parked\n"); */
-      /*             } */
-      /*             if (steps > 0) { */
-      /*                steps_left = (int32_t)steps * SPR
-       *                / LA_needle.pitch */
-      /*                   - LA_needle.motor.speed_ramp.step_count; */
-      /*             } */
-      /*             else { */
-      /*                steps_left = -1 * (int32_t)steps * SPR
-       *                / LA_needle.pitch
-       *                */
-      /*                   - LA_needle.motor.speed_ramp.step_count; */
-      /*             } */
-      /*             printf("    Running... Steps Left: %d\n",
-       *             steps_left); */
-      /*             delay_ms(250); */
-      /*          } */
-      /*  */
-      /*          printf("    Done with command\n"); */
-      /*  */
-      /*          show_motor_data(position, accel, decel, speed, steps);
-       *          */
-      /*       } */
    }//end while (1)
 }
 
 /** \brief Sets the new state of the machine.
  *
- * Convenience method for setting the state of the machine to a new state. Not
+ * Convenience method for setting the state of the machine to a new state.
+ * Not
  * implemented as a a macro so we ca force the compiler to type check the
  * parameters.
  *
@@ -403,7 +432,9 @@ static void show_help_message(void)
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
                             int16_t steps) {
-   printf("\n\r LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d\n\r>",
+
+   printf("\n"); // do not remove, solves unknown bug
+   printf("LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d\n",
           position, acceleration, deceleration, speed, steps);
 }
 
@@ -419,7 +450,23 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
    // If a command is received, check the command and act on it.
    if (USART_BC_get_string(command_buffer))
    {
-      if (command_buffer[command_ndx] == 'm') {
+      if (command_buffer[command_ndx] == 'r') {
+         ++command_ndx;
+         if (command_buffer[command_ndx++] == 'u') {
+            if (command_buffer[command_ndx++] == 'n') {
+               if (command_buffer[command_ndx++] == 'm') {
+                  command = RUN_MATLAB;
+               }
+               else {
+                  command = RUN;
+               }
+            }
+         }
+      }
+      else if (command_buffer[command_ndx] == 'h') {
+         command = HOME;
+      }
+      else if (command_buffer[command_ndx] == 'm') {
          ++command_ndx;
          // Move with...
          if (command_buffer[command_ndx] == '1') {
@@ -557,7 +604,7 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
          command = HELP;
       }
       else {
-         command = HELP; // invalid command
+         command = BRAKE;
       }
 
       // Clear RXbuffer.
@@ -567,7 +614,8 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
    return command;
 }
 
-static uint8_t find_next_param(char *command_buffer, uint8_t start_position) {
+static uint8_t find_next_param(char *command_buffer, uint8_t start_position)
+{
    uint8_t ndx = start_position;
 
    while ((command_buffer[ndx]!=' ') &&

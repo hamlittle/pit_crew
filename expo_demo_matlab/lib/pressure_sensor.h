@@ -81,7 +81,7 @@
 #define NUM_PS_Y_CHANS 24 ///< Number of y-position channels
 
 /// any reading, after compensated, less than this threshold is set to 0
-#define ZERO_THRESHOLD 100
+#define ZERO_THRESHOLD 50
 #define OVERSAMPLE_SIZE 10
 #define OVERSAMPLE_THRESHOLD 10
 
@@ -136,6 +136,7 @@ void PS_calibrate(PS_t *pressure_sensor);
 void PS_scan_all(PS_t *pressure_sensor);
 void PS_print_scan_buffer(PS_t *pressure_sensor);
 void PS_print_compensation_buffer(PS_t *pressure_sensor);
+bool PS_check(PS_t *pressure_sensor, uint16_t threshold);
 
 #endif /* end of include guard: _PRESSURE_SENSOR_H_ */
 /** @} */ /* end of \defgoup pressure_sensor */

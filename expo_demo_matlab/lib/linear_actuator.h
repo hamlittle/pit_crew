@@ -113,6 +113,7 @@ void LA_enable(LA_t *actuator);
 void LA_disable(LA_t *actuator);
 void LA_brake(LA_t *actuator);
 int16_t LA_get_position(LA_t *actuator);
+void LA_go_to_home(LA_t *actuator);
 
 #endif /* end of include guard: _LINEAR_ACTUATOR_H_ */
 /** @} */

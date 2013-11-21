@@ -33,6 +33,7 @@
 #include "pressure_sensor.h"
 #include "usart_bc.h"
 #include "linear_actuator.h"
+#include "global.h"
 
 /* Macro Definitions **********************************************************/
 
@@ -75,22 +76,35 @@
 
 #define LA_port PORTA            ///< stepper motor control port
 
-#define LA_NEEDLE_PITCH        500             ///< needle act pitch (0.5in)
 #define LA_NEEDLE_DISABLE_bm   PIN3_bm         ///< needle act /DISABLE pin
 #define LA_NEEDLE_DIRECTION_bm PIN4_bm         ///< needle act DIRECTION pin
 #define LA_NEEDLE_STEP_bm      PIN5_bm         ///< needle act STEP pin
 #define LA_NEEDLE_TIMER        SM_TIMER_NEEDLE ///< needle act timer to use
 
-#define LA_RING_PITCH        125             ///< ring act pitch (0.125in)
 #define LA_RING_DISABLE_bm   PIN0_bm         ///< ring act /DISABLE pin
 #define LA_RING_DIRECTION_bm PIN1_bm         ///< ring act DIRECTION pin
 #define LA_RING_STEP_bm      PIN2_bm         ///< ring act STEP pin
 #define LA_RING_TIMER        SM_TIMER_RING   ///< ring act timer to use
 
+#define LA_OFFSET 500 ///< offset between bottom of needles an top of ring
+#define LA_NEEDLE_ENGAGE_SPEED 2000
+#define LA_NEEDLE_ENGAGE_ACCEL 500
+#define LA_NEEDLE_ENGAGE_DECEL 500
+#define LA_NEEDLE_CHECK_DEPTH 600
+#define LA_NEEDLE_CHECK_SPEED 100
+#define LA_NEEDLE_CHECK_ACCEL 50
+#define LA_NEEDLE_CHECK_DECEL 50
+#define LA_NEEDLE_CHECK_SPEED_SLOW 10
+#define LA_NEEDLE_CHECK_ACCEL_SLOW 10
+#define LA_NEEDLE_CHECK_DECEL_SLOW 10
+
 #define BRAKE_PIN_vect PORTR_INT0_vect ///< Brake pin interrupt vector
 #define BRAKE_PIN_bm PIN6_bm           ///< Switch 6, translates to PR[0]
 
+
 ///@}
+
+#define PS_THRESHOLD 150
 
 /** \name Macro Defined Functions */
 ///@{
@@ -144,7 +158,11 @@ typedef enum command_types {
    SPEED2,  ///< Set max speed
    CAL,     ///< calibrate the pressure sensor
    SCAN,    ///< scan the sensor
+   RUN,     ///< run the full system, print out sensor readings
+   RUN_MATLAB, ///< run for matlab
    HELP,    ///< Show help menu
+   HOME,    ///< reset both motors to home
+   BRAKE,   ///< stop both motors
    NONE     ///< No command retrieved
 } command_t;
 
@@ -156,7 +174,7 @@ typedef enum pit_crew_state {
    IDLE,      ///< Idling (home state)
    RETAIN,    ///< Retaining Ring descending
    ENGAGE,    ///< Needles approaching peach
-   DETECT,    ///< Checking for pits
+   CHECK,    ///< Checking for pits
    DISENGAGE, ///< Needles retracting
    RELEASE,   ///< Retaining ring releasing peach
    PASS,      ///< Tell the user the result

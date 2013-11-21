@@ -224,6 +224,30 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
    print_buffer(PS_get_compensation_buffer(pressure_sensor));
 }
 
+/** \brief Checks the last scan of the sensor for any values above the given
+ *    threshold.
+ *
+ * This can be used as a convenience for seeing if anything hard has been
+ * detected in the peach.
+ *
+ * \param[in] pressure_sensor The pressure sensor to check
+ * \param[in] threshold The threshold value to use
+ *
+ * \return true if any value was above the threshold, otherwise false */
+bool PS_check(PS_t *pressure_sensor, uint16_t threshold) {
+   uint8_t x_ndx, y_ndx;
+
+   for (y_ndx = 0; y_ndx < NUM_PS_Y_CHANS; ++y_ndx) {
+      for (x_ndx = 0; x_ndx < NUM_PS_X_CHANS; ++x_ndx) {
+         if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >= threshold) {
+            return true;
+         }
+      }
+   }
+
+   return false;
+}
+
 /* Private Function Definitions ***********************************************/
 
 /** \brief Sweeps the pressure sensor, and compensates the results.
@@ -238,7 +262,7 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
    uint8_t y_channel, x_channel;
    uint16_t oversample_buffer[OVERSAMPLE_SIZE];
    uint16_t result;
-   uint16_t comp = 0;
+   uint16_t comp = ZERO_THRESHOLD;
    uint16_t min;
    uint16_t max;
    uint8_t oversample_ndx;
@@ -258,11 +282,14 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
          ADC_set_output_data(&adc0, MPx_channels+x_channel);
          ADC_sample_once(&adc0);
 
-         /* stay on the same y channel */
-         ADC_set_output_data(&adc1, MPy_channels+y_channel);
+         comp = ZERO_THRESHOLD;
+
          for (oversample_ndx = 0; oversample_ndx < OVERSAMPLE_SIZE;
               ++oversample_ndx) {
             oversample_buffer[oversample_ndx] = ADC_sample_once(&adc1);
+            if (oversample_buffer[oversample_ndx] & SIGN_BIT) {
+               oversample_buffer[oversample_ndx] = 0;
+            }
          }
          min = get_min(oversample_buffer);
          max = get_max(oversample_buffer);
@@ -274,21 +301,21 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
          }
 
          if (comp_buffer != NULL) {
-            comp = comp_buffer[y_channel][x_channel]
-               + ZERO_THRESHOLD;
+            comp = comp_buffer[y_channel][x_channel] + ZERO_THRESHOLD;
             if (comp > result) { /* if comp is gt result, set to 0  */
-               comp = result;
+               result = 0;
+               comp = ZERO_THRESHOLD;
             }
          }
-         if (result & SIGN_BIT) {
-            result = 0;
-            comp = 0;
-         }
+         comp -=ZERO_THRESHOLD;
          buffer[y_channel][x_channel] = result-comp;
 
          for (oversample_ndx = 0; oversample_ndx < OVERSAMPLE_SIZE;
               ++oversample_ndx) {
             oversample_buffer[oversample_ndx] = ADC_sample_once(&adc0);
+            if (oversample_buffer[oversample_ndx] & SIGN_BIT) {
+               oversample_buffer[oversample_ndx] = 0;
+            }
          }
          min = get_min(oversample_buffer);
          max = get_max(oversample_buffer);
@@ -303,13 +330,15 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
             comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)]
                + ZERO_THRESHOLD;
             if (comp > result) { /* if comp is gt result, set to 0  */
-               comp = result;
+               result = 0;
+               comp = ZERO_THRESHOLD;
             }
          }
          if (result & SIGN_BIT) {
             result = 0;
-            comp = 0;
+            comp = ZERO_THRESHOLD;
          }
+         comp -= ZERO_THRESHOLD;
          buffer[y_channel][x_channel + (NUM_PS_X_CHANS)/2] = result-comp;
       }
    }
@@ -323,9 +352,9 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
    int8_t y_channel, x_channel;
 
-   for (y_channel = 0; y_channel < NUM_PS_Y_CHANS; ++y_channel) {
+   for (x_channel = 0; x_channel < NUM_PS_X_CHANS ; ++x_channel) {
       printf("\n");
-      for (x_channel = 0; x_channel < NUM_PS_X_CHANS ; ++x_channel) {
+      for (y_channel = 0; y_channel < NUM_PS_Y_CHANS; ++y_channel) {
          printf("%4u ", buffer[y_channel][x_channel]);
       }
    }

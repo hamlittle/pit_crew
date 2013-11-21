@@ -127,5 +127,19 @@ void LA_brake(LA_t *actuator) {
  *
  * \return Position of the motor since the last home */
 int16_t LA_get_position(LA_t *actuator) {
-   return SM_get_position(&(actuator->motor)) * actuator->pitch / SPR;
+   return (int16_t)((int32_t)(SM_get_position(&(actuator->motor)))
+                    * actuator->pitch / SPR);
+}
+
+/** \brief Moves the actuator to its home position.
+ *
+ * This moves the actuator back to its home position, and homes the position to
+ * 0.
+ *
+ * \param[in] acutator The actuator to move to home */
+void LA_go_to_home(LA_t *actuator) {
+
+   /* just move a distance we know the limit switch is within
+    * motor will stop when it hits it */
+   LA_move(actuator, -4000, 400, 400, 1600);
 }

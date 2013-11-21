@@ -68,8 +68,12 @@
 #include <avr/io.h>
 #include "tc_driver.h"
 #include "stepper_motor.h"
+#include "global.h"
 
 /* Macro Defintions ***********************************************************/
+
+#define SM_OFFSET 200 ///< dist b/w needle carriage and retaining ring
+
 /** \name Limit Switch Definitions */
 ///@{
 
@@ -89,13 +93,6 @@
 #define TIMER_RING_OVF_vect   TCC1_OVF_vect ///< Retaining Ring timer OVF IV
 
 #define TIMER_FREQ 125000 ///< Both motors timer's frequency (Hz)
-
-///@}
-
-/** \name Stepper Motor Definitions */
-///@{
-
-#define SPR 400 ///< Motor steps per full revolution
 
 ///@}
 
