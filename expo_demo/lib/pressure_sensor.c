@@ -238,7 +238,7 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
    uint8_t y_channel, x_channel;
    uint16_t oversample_buffer[OVERSAMPLE_SIZE];
    uint16_t result;
-   uint16_t comp = 0;
+   uint16_t comp = ZERO_THRESHOLD;
    uint16_t min;
    uint16_t max;
    uint8_t oversample_ndx;
@@ -258,11 +258,14 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
          ADC_set_output_data(&adc0, MPx_channels+x_channel);
          ADC_sample_once(&adc0);
 
-         /* stay on the same y channel */
-         ADC_set_output_data(&adc1, MPy_channels+y_channel);
+         comp = ZERO_THRESHOLD;
+
          for (oversample_ndx = 0; oversample_ndx < OVERSAMPLE_SIZE;
               ++oversample_ndx) {
             oversample_buffer[oversample_ndx] = ADC_sample_once(&adc1);
+            if (oversample_buffer[oversample_ndx] & SIGN_BIT) {
+               oversample_buffer[oversample_ndx] = 0;
+            }
          }
          min = get_min(oversample_buffer);
          max = get_max(oversample_buffer);
@@ -274,21 +277,21 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
          }
 
          if (comp_buffer != NULL) {
-            comp = comp_buffer[y_channel][x_channel]
-               + ZERO_THRESHOLD;
+            comp = comp_buffer[y_channel][x_channel] + ZERO_THRESHOLD;
             if (comp > result) { /* if comp is gt result, set to 0  */
-               comp = result;
+               result = 0;
+               comp = ZERO_THRESHOLD;
             }
          }
-         if (result & SIGN_BIT) {
-            result = 0;
-            comp = 0;
-         }
+         comp -=ZERO_THRESHOLD;
          buffer[y_channel][x_channel] = result-comp;
 
          for (oversample_ndx = 0; oversample_ndx < OVERSAMPLE_SIZE;
               ++oversample_ndx) {
             oversample_buffer[oversample_ndx] = ADC_sample_once(&adc0);
+            if (oversample_buffer[oversample_ndx] & SIGN_BIT) {
+               oversample_buffer[oversample_ndx] = 0;
+            }
          }
          min = get_min(oversample_buffer);
          max = get_max(oversample_buffer);
@@ -303,13 +306,15 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
             comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)]
                + ZERO_THRESHOLD;
             if (comp > result) { /* if comp is gt result, set to 0  */
-               comp = result;
+               result = 0;
+               comp = ZERO_THRESHOLD;
             }
          }
          if (result & SIGN_BIT) {
             result = 0;
-            comp = 0;
+            comp = ZERO_THRESHOLD;
          }
+         comp -= ZERO_THRESHOLD;
          buffer[y_channel][x_channel + (NUM_PS_X_CHANS)/2] = result-comp;
       }
    }

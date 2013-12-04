@@ -177,6 +177,7 @@ int main(void) {
 
    command_t command;
    bool matlab = false;
+   uint16_t threshold;
 
    /* call all of the setup_* functions */
    cli();
@@ -196,9 +197,9 @@ int main(void) {
 
    /* show the current state of the linear actuator */
    show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                   accel1, decel1, speed1, steps1);
+                   accel1, decel1, speed1, steps1, threshold);
    show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                   accel2, decel2, speed2, steps2);
+                   accel2, decel2, speed2, steps2, threshold);
 
    PS_calibrate(&machine.pressure_sensor);
 
@@ -207,15 +208,16 @@ int main(void) {
 
    while (1) {
 
-      if (SS_OPEN()) {
-         set_state(&machine, STOP);
-      }
+      /* if (SS_OPEN()) { */
+      /*    set_state(&machine, STOP); */
+      /* } */
 
       switch (get_state(&machine)) {
 
          case IDLE:
             command = parse_command(&steps1, &accel1, &decel1, &speed1,
-                                    &steps2, &accel2, &decel2, &speed2);
+                                    &steps2, &accel2, &decel2, &speed2,
+                                    &threshold);
             matlab = false;
 
             switch(command) {
@@ -278,9 +280,9 @@ int main(void) {
                case HELP:
                   show_help_message();
                   show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                                  accel1, decel1, speed1, steps1);
+                                  accel1, decel1, speed1, steps1, threshold);
                   show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                                  accel2, decel2, speed2, steps2);
+                                  accel2, decel2, speed2, steps2, threshold);
                   printf("\n>");
                   break;
 
@@ -308,7 +310,8 @@ int main(void) {
                 LA_get_position(&machine.retaining_ring)-LA_OFFSET) {
 
                if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
-                                 &accel2, &decel2, &speed2) == BRAKE) {
+                                 &accel2, &decel2, &speed2, &threshold)
+                   == BRAKE) {
 
                   set_state(&machine, STOP);
                }
@@ -343,14 +346,15 @@ int main(void) {
                 - LA_OFFSET + LA_NEEDLE_CHECK_DEPTH) {
 
                if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
-                                 &accel2, &decel2, &speed2) == BRAKE) {
+                                 &accel2, &decel2, &speed2, &threshold)
+                   == BRAKE) {
 
                   set_state(&machine, STOP);
                }
                else {
                   PS_scan_all(&machine.pressure_sensor);
 
-                  if (PS_check(&machine.pressure_sensor, PS_THRESHOLD)) {
+                  if (PS_check(&machine.pressure_sensor, threshold)) {
                      set_state(&machine, DISENGAGE);
                      printf("\n\n\n\n   !!!!!!PIT!!!!!!\n\n\n\n");
                      break;
@@ -431,18 +435,19 @@ static void show_help_message(void)
  */
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
-                            int16_t steps) {
+                            int16_t steps, uint16_t threshold) {
 
    printf("\n"); // do not remove, solves unknown bug
-   printf("LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d\n",
-          position, acceleration, deceleration, speed, steps);
+   printf("LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d    t: %d\n",
+          position, acceleration, deceleration, speed, steps, threshold);
 }
 
 
 static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                uint16_t *decel1, uint16_t *speed1,
                                int16_t *steps2, uint16_t *accel2,
-                               uint16_t *decel2, uint16_t *speed2) {
+                               uint16_t *decel2, uint16_t *speed2,
+                               uint16_t *threshold) {
    char command_buffer[USART_RX_BUFFER_SIZE];
    command_t command = NONE;
    uint8_t command_ndx = 0;
@@ -461,6 +466,14 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                   command = RUN;
                }
             }
+         }
+      }
+      else if (command_buffer[command_ndx] == 't') {
+         ++command_ndx;
+         if (command_buffer[command_ndx++] == ' '){
+            // ...new threshold given
+            *threshold = atoi((const char *)command_buffer+command_ndx);
+            command = THRESH;
          }
       }
       else if (command_buffer[command_ndx] == 'h') {

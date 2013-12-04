@@ -249,25 +249,22 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
       for (x_channel = 0; x_channel < (NUM_PS_X_CHANS / 2); ++x_channel) {
 
          /* stay on the same y channel */
-         ADC_set_output_data(&adc1, MPy_channels+y_channel);
+         ADC_set_output_data(&adc0, MPx_channels+x_channel);
+         ADC_sample_once(&adc0);
+         delay_ms(5);
+
          result = ADC_sample_once(&adc1);
-         if (comp_buffer) {
-            comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)];
+         if (comp_buffer != NULL) {
+            comp = comp_buffer[y_channel][x_channel];
             if (comp > result) { /* if comp is gt result, save a 0 in buffer */
                comp = result;
             }
          }
          buffer[y_channel][x_channel] = result - comp;
 
-         if (x_channel == (NUM_PS_X_CHANS / 2) - 1) { /* set x_channel to 0 */
-            ADC_reset_channel(&adc0);
-         }
-         else { /* increase to the next mpx channel */
-            ADC_set_output_data(&adc0, MPx_channels+x_channel+1);
-         }
          result = ADC_sample_once(&adc0);
-         if (comp_buffer) {
-            comp = comp_buffer[y_channel][x_channel];
+         if (comp_buffer != NULL) {
+            comp = comp_buffer[y_channel][x_channel + (NUM_PS_X_CHANS/2)];
             if (comp > result) { /* if comp is gt result, save a 0 in buffer */
                comp = result;
             }
@@ -285,6 +282,7 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
    int8_t y_channel, x_channel;
 
+   printf("\n\n");
    for (y_channel = 0; y_channel < NUM_PS_Y_CHANS; ++y_channel) {
       printf("\n");
       for (x_channel = 0; x_channel < NUM_PS_X_CHANS ; ++x_channel) {

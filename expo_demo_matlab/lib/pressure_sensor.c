@@ -237,8 +237,8 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
 bool PS_check(PS_t *pressure_sensor, uint16_t threshold) {
    uint8_t x_ndx, y_ndx;
 
-   for (y_ndx = 0; y_ndx < NUM_PS_Y_CHANS; ++y_ndx) {
-      for (x_ndx = 0; x_ndx < NUM_PS_X_CHANS; ++x_ndx) {
+   for (y_ndx = PS_Y_MIN; y_ndx < PS_Y_MAX; ++y_ndx) {
+      for (x_ndx = PS_X_MIN; x_ndx < PS_X_MAX; ++x_ndx) {
          if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >= threshold) {
             return true;
          }
@@ -281,6 +281,7 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
          /* set the x_channel, but dont use the conversion result */
          ADC_set_output_data(&adc0, MPx_channels+x_channel);
          ADC_sample_once(&adc0);
+         /* delay_ms(5); */
 
          comp = ZERO_THRESHOLD;
 
@@ -352,9 +353,9 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
    int8_t y_channel, x_channel;
 
-   for (x_channel = 0; x_channel < NUM_PS_X_CHANS ; ++x_channel) {
+   for (y_channel = PS_Y_MIN; y_channel < PS_Y_MAX; ++y_channel) {
       printf("\n");
-      for (y_channel = 0; y_channel < NUM_PS_Y_CHANS; ++y_channel) {
+      for (x_channel = PS_X_MIN; x_channel < PS_X_MAX ; ++x_channel) {
          printf("%4u ", buffer[y_channel][x_channel]);
       }
    }

@@ -81,7 +81,7 @@
 #define NUM_PS_Y_CHANS 24 ///< Number of y-position channels
 
 /// any reading, after compensated, less than this threshold is set to 0
-#define ZERO_THRESHOLD 100
+#define ZERO_THRESHOLD 0
 #define OVERSAMPLE_SIZE 10
 #define OVERSAMPLE_THRESHOLD 10
 

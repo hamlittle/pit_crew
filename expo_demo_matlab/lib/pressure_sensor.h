@@ -77,13 +77,17 @@
 
 /* Macro Definitions **********************************************************/
 
+#define PS_X_MIN 9
+#define PS_X_MAX 19
+#define PS_Y_MIN 9
+#define PS_Y_MAX 19
 #define NUM_PS_X_CHANS 28 ///< Number of x-position channels
 #define NUM_PS_Y_CHANS 24 ///< Number of y-position channels
 
 /// any reading, after compensated, less than this threshold is set to 0
-#define ZERO_THRESHOLD 50
-#define OVERSAMPLE_SIZE 10
-#define OVERSAMPLE_THRESHOLD 10
+#define ZERO_THRESHOLD 40
+#define OVERSAMPLE_SIZE 5
+#define OVERSAMPLE_THRESHOLD 100
 
 #define SIGN_BIT (0x0001 << 11)
 

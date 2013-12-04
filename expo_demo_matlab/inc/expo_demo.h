@@ -90,7 +90,7 @@
 #define LA_NEEDLE_ENGAGE_SPEED 2000
 #define LA_NEEDLE_ENGAGE_ACCEL 500
 #define LA_NEEDLE_ENGAGE_DECEL 500
-#define LA_NEEDLE_CHECK_DEPTH 600
+#define LA_NEEDLE_CHECK_DEPTH 700
 #define LA_NEEDLE_CHECK_SPEED 100
 #define LA_NEEDLE_CHECK_ACCEL 50
 #define LA_NEEDLE_CHECK_DECEL 50
@@ -163,6 +163,7 @@ typedef enum command_types {
    HELP,    ///< Show help menu
    HOME,    ///< reset both motors to home
    BRAKE,   ///< stop both motors
+   THRESH,  ///< set new threshold for sensor
    NONE     ///< No command retrieved
 } command_t;
 
@@ -209,11 +210,12 @@ INLINE void set_state(PC_t *machine, PC_STATE_t state);
 static void show_help_message(void);
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
-                            int16_t steps);
+                            int16_t steps, uint16_t threshold);
 static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                uint16_t *decel1, uint16_t *speed1,
                                int16_t *steps2, uint16_t *accel2,
-                               uint16_t *decel2, uint16_t *speed2);
+                               uint16_t *decel2, uint16_t *speed2,
+                               uint16_t *threshold);
 static uint8_t find_next_param(char *command_buffer, uint8_t start_position);
 
 #endif /* end of include guard: _TEST_LIMIT_SWITCH_H_ */
