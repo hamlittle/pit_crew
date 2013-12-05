@@ -107,7 +107,17 @@ static void setup_switches(uint8_t switch_mask) {
 static void setup_safety_switch(void)  {
    SS_PORT.DIRCLR = SS_PIN_bm;
    PORTCFG.MPCMASK = SS_PIN_bm;
-   SS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc;
+   SS_PORT.PIN0CTRL = PORT_OPC_PULLUP_gc;
+}
+
+/** \brief Sets up the Retaining Ring sensor.
+ *
+ * All three pins on the retaining ring sensor will read high when the peach is
+ * retained. To check for proper retention, use the macro defined RETAINED(). */
+static void setup_retain_sensor(void) {
+   RS_PORT.DIRCLR = RS_PIN_gm;
+   PORTCFG.MPCMASK = RS_PIN_gm;
+   RS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc;
 }
 
 /** \brief Initializes the pressure sensor library.
@@ -162,22 +172,20 @@ int main(void) {
 
    int16_t steps1 = 1000;
    int16_t steps2 = 1000;
-   uint16_t accel1 = 100;
-   uint16_t accel2 = 100;
-   uint16_t decel1 = 100;
-   uint16_t decel2 = 100;
-   uint16_t speed1 = 800;
-   uint16_t speed2 = 800;
-
-   uint16_t delay_ndx = 0;
-   uint8_t frame_ndx;
-   uint8_t frames = 10;
+   uint16_t accel1 = 500;
+   uint16_t accel2 = 500;
+   uint16_t decel1 = 500;
+   uint16_t decel2 = 500;
+   uint16_t speed1 = 2000;
+   uint16_t speed2 = 2000;
 
    bool move_made = false;
+   bool stop_printed = false;
 
    command_t command;
    bool matlab = false;
-   uint16_t threshold;
+   uint16_t abs_threshold = 1100;
+   uint16_t delta_threshold = 600;
 
    /* call all of the setup_* functions */
    cli();
@@ -185,6 +193,7 @@ int main(void) {
    setup_LEDs();
    setup_switches(switch_mask);
    setup_safety_switch();
+   setup_retain_sensor();
    setup_pressure_sensor(&(machine.pressure_sensor));
    setup_USART_BC();
    setup_linear_actuators(&(machine.needle_carriage),
@@ -197,9 +206,11 @@ int main(void) {
 
    /* show the current state of the linear actuator */
    show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                   accel1, decel1, speed1, steps1, threshold);
+                   accel1, decel1, speed1, steps1, abs_threshold,
+                   delta_threshold);
    show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                   accel2, decel2, speed2, steps2, threshold);
+                   accel2, decel2, speed2, steps2, abs_threshold,
+                   delta_threshold);
 
    PS_calibrate(&machine.pressure_sensor);
 
@@ -217,7 +228,7 @@ int main(void) {
          case IDLE:
             command = parse_command(&steps1, &accel1, &decel1, &speed1,
                                     &steps2, &accel2, &decel2, &speed2,
-                                    &threshold);
+                                    &abs_threshold, &delta_threshold);
             matlab = false;
 
             switch(command) {
@@ -226,7 +237,7 @@ int main(void) {
                   printf("movie_begin\n");
                case RUN:
                   printf("Beginning system run\n");
-                  set_state(&machine, ENGAGE);
+                  set_state(&machine, RETAIN);
                   move_made = false;
                   break;
 
@@ -280,9 +291,11 @@ int main(void) {
                case HELP:
                   show_help_message();
                   show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                                  accel1, decel1, speed1, steps1, threshold);
+                                  accel1, decel1, speed1, steps1, abs_threshold,
+                                  delta_threshold);
                   show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                                  accel2, decel2, speed2, steps2, threshold);
+                                  accel2, decel2, speed2, steps2, abs_threshold,
+                                  delta_threshold);
                   printf("\n>");
                   break;
 
@@ -293,11 +306,32 @@ int main(void) {
             break;
 
          case RETAIN:
-            printf("Retaining peach\n");
+            if (!move_made) {
+               printf("Retaining peach\n");
+               LA_move(&machine.retaining_ring,
+                       LA_RING_RETAIN_DEPTH,
+                       LA_RING_RETAIN_ACCEL, LA_RING_RETAIN_DECEL,
+                       LA_RING_RETAIN_SPEED);
+               move_made = true;
+            }
+            if (RETAINED()) {
+               LA_brake(&machine.retaining_ring);
+               printf("Peach retained\n");
+               set_state(&machine, ENGAGE);
+               move_made = false;
+            }
+            if ((LA_get_position(&machine.retaining_ring)
+                 > LA_RING_RETAIN_DEPTH-LA_RING_RETAIN_OFFSET)
+                && !RETAINED()) {
+               printf("No Peach found: resetting\n");
+               set_state(&machine, RELEASE);
+               move_made = false;
+            }
             break;
 
          case ENGAGE:
             if (!move_made) {
+               PS_calibrate(&machine.pressure_sensor);
                printf("Engaging Needles\n");
                LA_move(&machine.needle_carriage,
                        LA_get_position(&machine.retaining_ring) - LA_OFFSET,
@@ -306,27 +340,26 @@ int main(void) {
                move_made = true;
             }
 
-            if (LA_get_position(&machine.needle_carriage) !=
-                LA_get_position(&machine.retaining_ring)-LA_OFFSET) {
+            if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
+                              &accel2, &decel2, &speed2, &abs_threshold,
+                              &delta_threshold)
+                == BRAKE) {
 
-               if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
-                                 &accel2, &decel2, &speed2, &threshold)
-                   == BRAKE) {
-
-                  set_state(&machine, STOP);
-               }
+               set_state(&machine, STOP);
             }
-            else {
+            if (LA_get_position(&machine.needle_carriage) >=
+                LA_get_position(&machine.retaining_ring)
+                - LA_OFFSET - LA_NEEDLE_ENGAGE_OFFSET) {
+
                set_state(&machine, CHECK);
                move_made = false;
             }
             break;
 
          case CHECK:
-            PS_calibrate(&machine.pressure_sensor);
-
             if (!move_made) {
                printf("Checking Peach\n");
+               LA_brake(&machine.needle_carriage);
                if (matlab) {
                   LA_move(&machine.needle_carriage,
                           LA_NEEDLE_CHECK_DEPTH, LA_NEEDLE_CHECK_ACCEL_SLOW,
@@ -341,12 +374,13 @@ int main(void) {
                move_made = true;
             }
 
-            if (LA_get_position(&machine.needle_carriage) !=
+            if (LA_get_position(&machine.needle_carriage) <
                 LA_get_position(&machine.retaining_ring)
-                - LA_OFFSET + LA_NEEDLE_CHECK_DEPTH) {
+                - LA_OFFSET + LA_NEEDLE_CHECK_DEPTH - LA_NEEDLE_CHECK_OFFSET) {
 
                if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
-                                 &accel2, &decel2, &speed2, &threshold)
+                                 &accel2, &decel2, &speed2, &abs_threshold,
+                                 &delta_threshold)
                    == BRAKE) {
 
                   set_state(&machine, STOP);
@@ -354,10 +388,10 @@ int main(void) {
                else {
                   PS_scan_all(&machine.pressure_sensor);
 
-                  if (PS_check(&machine.pressure_sensor, threshold)) {
+                  if (PS_check(&machine.pressure_sensor, abs_threshold,
+                               delta_threshold)) {
                      set_state(&machine, DISENGAGE);
                      printf("\n\n\n\n   !!!!!!PIT!!!!!!\n\n\n\n");
-                     break;
                   }
                   if (matlab) {
                      printf("pressure_sensor_begin\n");
@@ -378,11 +412,14 @@ int main(void) {
             }
             printf("Disengaging Needles\n");
             LA_go_to_home(&machine.needle_carriage);
-            set_state(&machine, IDLE);
+            PS_print_scan_buffer(&machine.pressure_sensor);
+            set_state(&machine, RELEASE);
             break;
 
          case RELEASE:
             printf("Releasing Peach\n");
+            LA_go_to_home(&machine.retaining_ring);
+            set_state(&machine, IDLE);
             break;
 
          case PASS:
@@ -390,10 +427,21 @@ int main(void) {
             break;
 
          case STOP:
-            printf("Machine Stopped\n");
+            /* if (!stop_printed) { */
+            /*    printf("Safety Lid Removed: Operation Stopped\n"); */
+            /*    stop_printed = true; */
+            /* } */
+            printf("Machine stopped\n");
             LA_brake(&machine.needle_carriage);
             LA_brake(&machine.retaining_ring);
             set_state(&machine, IDLE);
+            /* if (!SS_OPEN()) { */
+            /*    printf("Safety Lid Replaced: Resetting Machine\n"); */
+            /*    LA_go_to_home(&machine.needle_carriage); */
+            /*    LA_go_to_home(&machine.retaining_ring); */
+            /*    set_state(&machine, IDLE); */
+            /*    stop_printed = false; */
+            /* } */
             break;
 
       }
@@ -435,11 +483,14 @@ static void show_help_message(void)
  */
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
-                            int16_t steps, uint16_t threshold) {
+                            int16_t steps, uint16_t abs_threshold, uint16_t
+                            delta_threshold) {
 
    printf("\n"); // do not remove, solves unknown bug
-   printf("LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d    t: %d\n",
-          position, acceleration, deceleration, speed, steps, threshold);
+   printf("LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d    "
+          "at: %u    dt: %u\n",
+          position, acceleration, deceleration, speed, steps, abs_threshold,
+          delta_threshold);
 }
 
 
@@ -447,7 +498,8 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                uint16_t *decel1, uint16_t *speed1,
                                int16_t *steps2, uint16_t *accel2,
                                uint16_t *decel2, uint16_t *speed2,
-                               uint16_t *threshold) {
+                               uint16_t *abs_threshold,
+                               uint16_t *delta_threshold) {
    char command_buffer[USART_RX_BUFFER_SIZE];
    command_t command = NONE;
    uint8_t command_ndx = 0;
@@ -468,12 +520,25 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
             }
          }
       }
-      else if (command_buffer[command_ndx] == 't') {
+      else if (command_buffer[command_ndx] == 'a') {
          ++command_ndx;
-         if (command_buffer[command_ndx++] == ' '){
-            // ...new threshold given
-            *threshold = atoi((const char *)command_buffer+command_ndx);
-            command = THRESH;
+         if (command_buffer[command_ndx++] == 't') {
+            if (command_buffer[command_ndx++] == ' '){
+               // ...new threshold given
+               *abs_threshold = atoi((const char *)command_buffer+command_ndx);
+               command = HELP;
+            }
+         }
+      }
+      else if (command_buffer[command_ndx] == 'd') {
+         ++command_ndx;
+         if (command_buffer[command_ndx++] == 't') {
+            if (command_buffer[command_ndx++] == ' '){
+               // ...new threshold given
+               *delta_threshold = atoi((const char *)
+                                       command_buffer+command_ndx);
+               command = HELP;
+            }
          }
       }
       else if (command_buffer[command_ndx] == 'h') {

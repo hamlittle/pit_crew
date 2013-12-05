@@ -355,7 +355,7 @@ static void SM_timer_OVF_handler(SM_t *motor) {
       if ((motor == needle_motor) && (LS_PORT.IN & LS_NEEDLE_PIN_bm)) {
          SM_brake(motor);
          SM_home(motor);
-         printf("Needle Carriage Homed");
+         printf("Needle Carriage Homed\n");
       }
       else if ((motor == ring_motor) && (LS_PORT.IN & LS_RING_PIN_bm)) {
          SM_brake(motor);

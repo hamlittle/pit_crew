@@ -113,7 +113,8 @@ volatile ADC_sel_t current_ADC;
 
 static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
                          uint16_t comp_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]);
-static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]);
+static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
+                         uint16_t check_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]);
 static uint16_t get_min(uint16_t *oversample_buffer);
 static uint16_t get_max(uint16_t *oversample_buffer);
 
@@ -166,6 +167,14 @@ void PS_init(PS_t *pressure_sensor) {
  * \param[in] pressure_sensor the pressure sensor to calibrate */
 void PS_calibrate(PS_t *pressure_sensor) {
    sweep_sensor(pressure_sensor->compensation_buffer, NULL);
+
+   uint8_t y_ndx, x_ndx;
+   for (y_ndx = 0; y_ndx < NUM_PS_Y_CHANS; ++y_ndx) {
+      for (x_ndx = 0; x_ndx < NUM_PS_X_CHANS; ++x_ndx) {
+         pressure_sensor->check_buffer[y_ndx][x_ndx] = 0;
+         pressure_sensor->scan_buffer[y_ndx][x_ndx] = 0;
+      }
+   }
 }
 
 /** \brief brief description
@@ -186,6 +195,14 @@ void PS_calibrate(PS_t *pressure_sensor) {
  *
  * \param[in] pressure_sensor pressure sensor to scan and compensate */
 void PS_scan_all(PS_t *pressure_sensor) {
+   uint8_t y_ndx, x_ndx;
+   for (y_ndx = 0; y_ndx < NUM_PS_Y_CHANS; ++y_ndx) {
+      for (x_ndx = 0; x_ndx < NUM_PS_X_CHANS; ++x_ndx) {
+         pressure_sensor->check_buffer[y_ndx][x_ndx] =
+            pressure_sensor->scan_buffer[y_ndx][x_ndx];
+      }
+   }
+
    sweep_sensor(pressure_sensor->scan_buffer,
                 pressure_sensor->compensation_buffer);
 
@@ -204,7 +221,8 @@ void PS_scan_all(PS_t *pressure_sensor) {
  *
  * \param[in] pressure_sensor the pressure sensor whose results to print */
 void PS_print_scan_buffer (PS_t *pressure_sensor) {
-   print_buffer(PS_get_scan_buffer(pressure_sensor));
+   print_buffer(PS_get_scan_buffer(pressure_sensor),
+                pressure_sensor->check_buffer);
 }
 
 /** \brief Prints the contents of the compensation buffer.
@@ -221,7 +239,7 @@ void PS_print_scan_buffer (PS_t *pressure_sensor) {
  *
  * \param[in] pressure_sensor whose compensation buffer to print */
 void PS_print_compensation_buffer(PS_t *pressure_sensor) {
-   print_buffer(PS_get_compensation_buffer(pressure_sensor));
+   print_buffer(PS_get_compensation_buffer(pressure_sensor), NULL);
 }
 
 /** \brief Checks the last scan of the sensor for any values above the given
@@ -231,16 +249,31 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
  * detected in the peach.
  *
  * \param[in] pressure_sensor The pressure sensor to check
- * \param[in] threshold The threshold value to use
+ * \param[in] abs_threshold The absolute threshold to check
+ * \param[in] delta_threshold The change from last reading threshold
  *
  * \return true if any value was above the threshold, otherwise false */
-bool PS_check(PS_t *pressure_sensor, uint16_t threshold) {
+bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold, uint16_t
+              delta_threshold) {
    uint8_t x_ndx, y_ndx;
 
    for (y_ndx = PS_Y_MIN; y_ndx < PS_Y_MAX; ++y_ndx) {
       for (x_ndx = PS_X_MIN; x_ndx < PS_X_MAX; ++x_ndx) {
-         if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >= threshold) {
+         if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >= abs_threshold) {
             return true;
+         }
+      }
+   }
+
+   for (y_ndx = PS_Y_MIN; y_ndx < PS_Y_MAX; ++y_ndx) {
+      for (x_ndx = PS_X_MIN; x_ndx < PS_X_MAX; ++x_ndx) {
+         if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >
+             pressure_sensor->check_buffer[y_ndx][x_ndx]) {
+            if (pressure_sensor->scan_buffer[y_ndx][x_ndx] -
+                pressure_sensor->check_buffer[y_ndx][x_ndx]
+                >= delta_threshold) {
+               return true;
+            }
          }
       }
    }
@@ -350,13 +383,25 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
  * \note If this is the scan buffer, the results are already compensated.
  *
  * \param[in] buffer The pressure sensor scan buffer to print out */
-static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]) {
+static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
+                         uint16_t check_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]){
    int8_t y_channel, x_channel;
 
    for (y_channel = PS_Y_MIN; y_channel < PS_Y_MAX; ++y_channel) {
       printf("\n");
       for (x_channel = PS_X_MIN; x_channel < PS_X_MAX ; ++x_channel) {
-         printf("%4u ", buffer[y_channel][x_channel]);
+         printf("%4u", buffer[y_channel][x_channel]);
+         if (check_buffer != NULL) {
+            if (buffer[y_channel][x_channel] >
+                check_buffer[y_channel][x_channel]) {
+               printf("(%3u)", buffer[y_channel][x_channel] -
+                      check_buffer[y_channel][x_channel]);
+            }
+            else {
+               printf("(  0)");
+            }
+         }
+         printf(" ");
       }
    }
 }

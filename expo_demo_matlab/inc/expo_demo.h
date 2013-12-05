@@ -40,17 +40,17 @@
 /** \name State Machine Definitions */
 ///@{
 
-#define LA_NEEDLE_SPEED 1000        ///< needle carriage max speed, 0.001 in/s
-#define LA_NEEDLE_ACCEL 400         ///< needle carriage accel, 0.001 in/s^2
-#define LA_NEEDLE_DECEL 400         ///< needle carriage decel, 0.001 in/s^2
+#define LA_NEEDLE_SPEED 2000        ///< needle carriage max speed, 0.001 in/s
+#define LA_NEEDLE_ACCEL 1000         ///< needle carriage accel, 0.001 in/s^2
+#define LA_NEEDLE_DECEL 1000         ///< needle carriage decel, 0.001 in/s^2
 #define LA_NEEDLE_ENGAGE_DIST 1000  ///< needle carriage engage travel, 0.001 in
 #define LA_NEEDLE_DETECT_DIST 500   ///< needle carriage engage travel, 0.001 in
 /// needle carriage retract travel, 0.001 in
 #define LA_NEEDLE_RETRACT_DIST (-LA_NEEDLE_ENGAGE_DIST-LA_NEEDLE_DETECT_DIST))
 
-#define LA_RING_SPEED 1000        ///< needle carriage max speed, 0.001 in/s
-#define LA_RING_ACCEL 400         ///< needle carriage accel, 0.001 in/s^2
-#define LA_RING_DECEL 400         ///< needle carriage decel, 0.001 in/s^2
+#define LA_RING_SPEED 2000        ///< needle carriage max speed, 0.001 in/s
+#define LA_RING_ACCEL 1000         ///< needle carriage accel, 0.001 in/s^2
+#define LA_RING_DECEL 1000         ///< needle carriage decel, 0.001 in/s^2
 #define LA_RING_RETAIN_DIST 500  ///< needle carriage engage travel, 0.001 in
 /// needle carriage retract travel, 0.001 in
 #define LA_RING_RELEASE_DIST (-LA_RING_RETAIN_DIST)
@@ -64,12 +64,30 @@
 
 /** \brief Check if the safety switch is open
  *
- * The safety switch is closed if the safety switch pin is high. When the
- * switch opens, the 5v signal is no longer connected to the pin, and the
- * safety switch pin will read low. */
-#define SS_OPEN() (!(SS_PORT.IN & SS_PIN_bm))
+ * The safety switch is set up as a pull up, and the machine frame is grounded,
+ * so when the pin goes low, the lid is closed, and when the pin is high, the
+ * lid is off */
+#define SS_OPEN() (SS_PORT.IN & SS_PIN_bm)
 
 ///@}
+
+/** \name Retaining Ring Sensor Definitions */
+/** @{ */
+
+#define RS_PORT PORTC   ///< Retaining Ring Sensor Port
+
+/// Retaining Ring Sensor Pin Mask Group
+#define RS_PIN_gm (PIN5_bm | PIN6_bm | PIN7_bm)
+
+/** \brief Checks if the peach has been retained.
+ *
+ * When all three pins connected to the contact sensor read hi, the peach is
+ * properly retained.
+ *
+ * \return True if peach is retained, otherwise false */
+#define RETAINED() ((RS_PORT.IN & RS_PIN_gm) == RS_PIN_gm)
+
+/** @} */
 
 /** \name Stepper Motor Definitions */
 ///@{
@@ -87,16 +105,27 @@
 #define LA_RING_TIMER        SM_TIMER_RING   ///< ring act timer to use
 
 #define LA_OFFSET 500 ///< offset between bottom of needles an top of ring
-#define LA_NEEDLE_ENGAGE_SPEED 2000
-#define LA_NEEDLE_ENGAGE_ACCEL 500
-#define LA_NEEDLE_ENGAGE_DECEL 500
-#define LA_NEEDLE_CHECK_DEPTH 700
-#define LA_NEEDLE_CHECK_SPEED 100
-#define LA_NEEDLE_CHECK_ACCEL 50
-#define LA_NEEDLE_CHECK_DECEL 50
-#define LA_NEEDLE_CHECK_SPEED_SLOW 10
-#define LA_NEEDLE_CHECK_ACCEL_SLOW 10
-#define LA_NEEDLE_CHECK_DECEL_SLOW 10
+
+#define LA_NEEDLE_ENGAGE_SPEED 4000
+#define LA_NEEDLE_ENGAGE_ACCEL 2000
+#define LA_NEEDLE_ENGAGE_DECEL 2000
+#define LA_NEEDLE_ENGAGE_OFFSET 10
+
+#define LA_NEEDLE_CHECK_DEPTH 600
+#define LA_NEEDLE_CHECK_SPEED 500
+#define LA_NEEDLE_CHECK_ACCEL 500
+#define LA_NEEDLE_CHECK_DECEL 6000
+#define LA_NEEDLE_CHECK_OFFSET 10
+
+#define LA_NEEDLE_CHECK_SPEED_SLOW 100
+#define LA_NEEDLE_CHECK_ACCEL_SLOW 50
+#define LA_NEEDLE_CHECK_DECEL_SLOW 50
+
+#define LA_RING_RETAIN_OFFSET 10
+#define LA_RING_RETAIN_DEPTH 1350 ///< max distance ring goes to retain peach
+#define LA_RING_RETAIN_ACCEL 1000
+#define LA_RING_RETAIN_DECEL 1000
+#define LA_RING_RETAIN_SPEED 2000
 
 #define BRAKE_PIN_vect PORTR_INT0_vect ///< Brake pin interrupt vector
 #define BRAKE_PIN_bm PIN6_bm           ///< Switch 6, translates to PR[0]
@@ -163,7 +192,6 @@ typedef enum command_types {
    HELP,    ///< Show help menu
    HOME,    ///< reset both motors to home
    BRAKE,   ///< stop both motors
-   THRESH,  ///< set new threshold for sensor
    NONE     ///< No command retrieved
 } command_t;
 
@@ -201,6 +229,7 @@ static void setup_clocks(void);
 static void setup_LEDs(void);
 static void setup_switches(uint8_t switch_mask);
 static void setup_safety_switch(void);
+static void setup_retain_sensor(void);
 static void setup_pressure_sensor(PS_t *pressure_sensor);
 static void setup_USART_BC(void);
 static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator);
@@ -210,12 +239,14 @@ INLINE void set_state(PC_t *machine, PC_STATE_t state);
 static void show_help_message(void);
 static void show_motor_data(int16_t position, uint16_t acceleration,
                             uint16_t deceleration, uint16_t speed,
-                            int16_t steps, uint16_t threshold);
+                            int16_t steps, uint16_t abs_threshold,
+                            uint16_t delta_threshold);
 static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                uint16_t *decel1, uint16_t *speed1,
                                int16_t *steps2, uint16_t *accel2,
                                uint16_t *decel2, uint16_t *speed2,
-                               uint16_t *threshold);
+                               uint16_t *abs_threshold,
+                               uint16_t *delta_threshold);
 static uint8_t find_next_param(char *command_buffer, uint8_t start_position);
 
 #endif /* end of include guard: _TEST_LIMIT_SWITCH_H_ */

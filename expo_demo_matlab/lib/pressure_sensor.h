@@ -103,6 +103,8 @@ typedef struct pressure_sensor_struct  {
    uint16_t compensation_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS];
    /// Sweep Scan buffer, adjusted using compensation_buffer
    uint16_t scan_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS];
+   /// Save values from last run here to check against
+   uint16_t check_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS];
 } PS_t;
 
 /** \name Macro Defined Functions *********************************************/
@@ -140,7 +142,8 @@ void PS_calibrate(PS_t *pressure_sensor);
 void PS_scan_all(PS_t *pressure_sensor);
 void PS_print_scan_buffer(PS_t *pressure_sensor);
 void PS_print_compensation_buffer(PS_t *pressure_sensor);
-bool PS_check(PS_t *pressure_sensor, uint16_t threshold);
+bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold,
+              uint16_t delta_threshold);
 
 #endif /* end of include guard: _PRESSURE_SENSOR_H_ */
 /** @} */ /* end of \defgoup pressure_sensor */

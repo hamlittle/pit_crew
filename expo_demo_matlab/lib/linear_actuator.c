@@ -141,5 +141,5 @@ void LA_go_to_home(LA_t *actuator) {
 
    /* just move a distance we know the limit switch is within
     * motor will stop when it hits it */
-   LA_move(actuator, -4000, 400, 400, 1600);
+   LA_move(actuator, -4000, 1000, 1000, 2000);
 }
