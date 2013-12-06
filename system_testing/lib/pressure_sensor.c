@@ -182,7 +182,19 @@ void PS_calibrate(PS_t *pressure_sensor) {
  *
  * The conversion result is saved internally in the pressure_sensor parameter,
  * and adjusted according to the last calibration performed on the pressure
- * sensor. To get access to the results, use PS_get_scan_buffer()
+ * sensor. To get access to the results, use PS_get_scan_buffer().
+ *
+ * When scanning the sensor, there are two noise filtering algorithms
+ * implemented. The first is zero-threshold filtering. Any value that is below
+ * this value will be considered 0. This is to reduce the high frequency, low
+ * amplitude noise on the filter. The second is oversampling, in which each
+ * point on the sensor is sampled a number of times, and the average of the
+ * values is used as the reading at that point. If the values from oversampling
+ * vary more than a threshold value, the value is set to 0, otherwise, the
+ * average of the values is used. This occurs before the zero
+ * threshold filtering; in otherwords, this averaged value is what is used as
+ * the value to the zero threshold. These settings can be adjusted by setting
+ * the #ZERO_THRESHOLD, #OVERSAMPLE_SIZE, and #OVERSAMPLE_THRESHOLD.
  *
  * \note Scanning is performed by synchronizing the order of ADC conversions to
  * adjust the sensor element being scanned appropriately (to change MPy
@@ -251,7 +263,11 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
  * any value in the scan buffer exceeds, will trigger pit detection. The delta
  * threshold is the value by which no single element of the scan buffer can have
  * increased from the scan before the most recent without triggering a pit
- * detection.
+ * detection. Note that if the last value for that sensor element was 0, the
+ * delta threshold check will not be used, as the first time a needle hits flesh
+ * the delta value was shown to jump by a large amount, and then increase in
+ * smaller amounts, unless there is a pit in that location, in which case each
+ * increment in pressure sensor readings change by a large amount.
  *
  * \param[in] pressure_sensor The pressure sensor to check
  * \param[in] abs_threshold The absolute threshold to check
@@ -267,16 +283,12 @@ bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold, uint16_t
          if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >= abs_threshold) {
             return true;
          }
-      }
-   }
-
-   for (y_ndx = PS_Y_MIN; y_ndx < PS_Y_MAX; ++y_ndx) {
-      for (x_ndx = PS_X_MIN; x_ndx < PS_X_MAX; ++x_ndx) {
          if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >
              pressure_sensor->check_buffer[y_ndx][x_ndx]) {
-            if (pressure_sensor->scan_buffer[y_ndx][x_ndx] -
-                pressure_sensor->check_buffer[y_ndx][x_ndx]
-                >= delta_threshold) {
+            if ((pressure_sensor->scan_buffer[y_ndx][x_ndx] -
+                 pressure_sensor->check_buffer[y_ndx][x_ndx]
+                 >= delta_threshold) &&
+                (pressure_sensor->check_buffer[y_ndx][x_ndx] != 0)) {
                return true;
             }
          }
@@ -292,6 +304,8 @@ bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold, uint16_t
  *
  * If performing a calibration sweep, pass NULL for the second parameter, and
  * no compensation will be performed.
+ *
+ * When sweeping
  *
  * \param[in] buffer buffer to save the sensor sweep results
  * \param[in] comp_buffer compensation values to use, or NULL to not use any */
@@ -398,8 +412,9 @@ static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
       for (x_channel = PS_X_MIN; x_channel < PS_X_MAX ; ++x_channel) {
          printf("%4u", buffer[y_channel][x_channel]);
          if (check_buffer != NULL) {
-            if (buffer[y_channel][x_channel] >
-                check_buffer[y_channel][x_channel]) {
+            if ((buffer[y_channel][x_channel] >
+                 check_buffer[y_channel][x_channel]) &&
+                (check_buffer[y_channel][x_channel] != 0)) {
                printf("(%3u)", buffer[y_channel][x_channel] -
                       check_buffer[y_channel][x_channel]);
             }

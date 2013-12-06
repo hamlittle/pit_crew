@@ -91,7 +91,7 @@
 /// any reading, after compensated, less than this threshold is set to 0
 #define ZERO_THRESHOLD 40        ///< zero threshold, \sa PS_scan_all()
 #define OVERSAMPLE_SIZE 5        ///< oversample rate, \sa PS_scan_all()
-#define OVERSAMPLE_THRESHOLD 100 ///< oversample threshold, \sa PS_scan_all()
+#define OVERSAMPLE_THRESHOLD 1000 ///< oversample threshold, \sa PS_scan_all()
 
 #define SIGN_BIT (0x0001 << 11)  ///< Sign bit of ADC conversion result
 
