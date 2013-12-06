@@ -331,7 +331,7 @@ libdoc:
 
 clean:
 	@echo -n Cleaning compiled files and documentation...
-	@rm -f $(LIB_NAME) *.o *.hex *.lst *.elf *~ *.swo *.swp
+	@rm -rf $(LIB_NAME) *.o *.hex *.lst *.elf *~ *.swo *.swp doc
 	@for subdir in $(LIB_DIRS); do \
 		rm -f $$subdir/*.o; \
 		rm -f $$subdir/*.lst; \

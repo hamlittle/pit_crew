@@ -25,11 +25,12 @@
 #ifndef _GLOBAL_H_
 #define _GLOBAL_H_
 
-#define LA_NEEDLE_PITCH        500             ///< needle act pitch (0.5in)
-#define LA_RING_PITCH        125             ///< ring act pitch (0.125in)
+/** \name Group Name */ /** @{ */
+#define LA_NEEDLE_PITCH 500 ///< needle act pitch (0.5in)
+#define LA_RING_PITCH   125 ///< ring act pitch (0.125in)
 
-#define SPR 400 ///< Motor steps per full revolution
-
+#define SPR 400 ///< Motor steps per full revolution (needle and ring acts)
+/** @} */
 
 #endif /* end of include guard: _GLOBAL_H_ */
 

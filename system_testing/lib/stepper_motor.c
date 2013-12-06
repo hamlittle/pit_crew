@@ -313,9 +313,8 @@ static void SM_speed_ramp_init(SM_SRD_t *speed_ramp) {
  *
  * This function also handles mapping the appropriate speed ramp to the
  *
- * \param[in] timer The timer to initialize (TIMER0 or TIMER1)
- * \param[in] speed_ramp The speed ramp
- */
+ * \param[in] motor The motor to initialize the timer for
+ * \param[in] timer The timer to initialize (TIMER0 or TIMER1) */
 static void SM_timer_init(SM_t *motor, SM_timer_t timer) {
    /* 32M/256 == 125K Hz*/
    if (timer == SM_TIMER_NEEDLE) {
@@ -343,6 +342,13 @@ static void SM_limit_switch_init(void) {
    LS_PORT.PIN0CTRL = PORT_OPC_PULLDOWN_gc; // hi on press
 }
 
+/** \brief Timer overflow handler for the stepper motors.
+ *
+ * Takes care of calculating the next timer interrupt value to continue along
+ * the computed speed profile, as well as checking if we've hit the limit
+ * switch when retracting the lineart actuator.
+ *
+ * \param[in] motor the motor to handle */
 static void SM_timer_OVF_handler(SM_t *motor) {
    uint16_t new_step_delay = 0;
    SM_SRD_t *speed_ramp = &(motor->speed_ramp);
@@ -520,8 +526,7 @@ static void SM_timer_stop(SM_timer_t timer) {
  *  direction required, switch the A motor lead with B, and the /A motor lead
  *  with /B.
  *
- *  \param[in] driver The driver to step
- *  \param[in] direction The direction to move (FORWARD or BACKWARD) */
+ *  \param[in] motor The motor to step one position */
 void SM_step(SM_t *motor) {
    PORT_t *port = motor->port;
    uint8_t STEP_bm = motor->STEP_bm;

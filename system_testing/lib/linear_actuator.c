@@ -136,7 +136,7 @@ int16_t LA_get_position(LA_t *actuator) {
  * This moves the actuator back to its home position, and homes the position to
  * 0.
  *
- * \param[in] acutator The actuator to move to home */
+ * \param[in] actuator The actuator to move to home */
 void LA_go_to_home(LA_t *actuator) {
 
    /* just move a distance we know the limit switch is within

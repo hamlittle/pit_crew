@@ -136,6 +136,7 @@ void PS_init(PS_t *pressure_sensor) {
       for (x_channel = 0; x_channel < NUM_PS_X_CHANS; ++x_channel) {
          pressure_sensor->compensation_buffer[y_channel][x_channel] = 0;
          pressure_sensor->scan_buffer[y_channel][x_channel] = 0;
+         pressure_sensor->scan_buffer[y_channel][x_channel] = 0;
       }
    }
 
@@ -243,10 +244,14 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
 }
 
 /** \brief Checks the last scan of the sensor for any values above the given
- *    threshold.
+ *    thresholds.
  *
  * This can be used as a convenience for seeing if anything hard has been
- * detected in the peach.
+ * detected in the peach. The absolute threshold is the absolute value, which if
+ * any value in the scan buffer exceeds, will trigger pit detection. The delta
+ * threshold is the value by which no single element of the scan buffer can have
+ * increased from the scan before the most recent without triggering a pit
+ * detection.
  *
  * \param[in] pressure_sensor The pressure sensor to check
  * \param[in] abs_threshold The absolute threshold to check
@@ -382,7 +387,8 @@ static void sweep_sensor(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
  *
  * \note If this is the scan buffer, the results are already compensated.
  *
- * \param[in] buffer The pressure sensor scan buffer to print out */
+ * \param[in] buffer The pressure sensor scan buffer to print out
+ * \param[in] check_buffer The check buffer to print out */
 static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
                          uint16_t check_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS]){
    int8_t y_channel, x_channel;
@@ -406,6 +412,11 @@ static void print_buffer(uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS],
    }
 }
 
+/** \brief Returns the min value from the given oversample_buffer.
+ *
+ * \param[in] oversample_buffer the oversample buffer to get the min value
+ *
+ * \return Minimum value of the oversample buffer */
 static uint16_t get_min(uint16_t *oversample_buffer) {
    uint16_t min = *oversample_buffer;
    uint8_t ndx;
@@ -419,6 +430,11 @@ static uint16_t get_min(uint16_t *oversample_buffer) {
    return min;
 }
 
+/** \brief Returns the max value from the given oversample_buffer.
+ *
+ * \param[in] oversample_buffer the oversample buffer to get the max value
+ *
+ * \return maximum value of the oversample buffer */
 static uint16_t get_max(uint16_t *oversample_buffer) {
    uint16_t max = *oversample_buffer;
    uint8_t ndx;

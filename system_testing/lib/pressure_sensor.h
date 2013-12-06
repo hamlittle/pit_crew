@@ -3,7 +3,7 @@
  *
  * \brief Enables interfacing with the matrix pressure sensor.
  *
- * This library simplifies interfacng with the Sensing Tex 672 element matrix
+ * This library simplifies interfacing with the Sensing Tex 672 element matrix
  * pressure sensor. Currently, only full scans of the pressure sensor are
  * enabled, there is no control over which elements are sampled.
  *
@@ -19,8 +19,15 @@
  *    - 1 sign bit
  *    - 11 bit conversion value (range: 0-2048)
  *
- * Additionally, the format of the each buffer (compensation and full sweep
- * scan)
+ * This library uses 3 buffers when interfacing with the sensor. The
+ * compensation buffer is populated by a call to PS_calibrate(). This buffer is
+ * subtracted from the values read during a call to PS_scan_all(), and these
+ * compensated values are saved in the scan buffer. Finally, the check buffer
+ * holds the compensated values of the previous scan. These values are used when
+ * checking that no value exceeds the delta threshold during calls to
+ * PS_check().
+ *
+ * Additionally, the format of the each buffer (compensation, scan, and check)
  * are as defined as:
  *    \code uint16_t buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS] \endcode
  * where \code buffer[y_pos][x_pos] \endcode returns the buffer element value at
@@ -33,15 +40,11 @@
  * PS_get_compensation_buffer() macro. Note that each of these macros expect
  * a pointer to the Pressure sensor struct as a parameter.
  *
- * This library assumes relies on the USART_BC library, and assumes that the
+ * This library relies on the USART_BC library, and assumes that the
  * user has enabled it through a call to USART_BC_init() before any of the print
  * functions in this library are called.
  *
- * This library assumes that the <0,0> point is in the upper left corner of the
- * sensor, however this can be adjusted by changing the order of the elements of
- * MPx_channels and MPy_channels variables in the file pressure_sensor.c
- *
- * \note This library depends on a few interrupts which are set up
+ * This library depends on a few interrupts which are set up
  * internally. ADC0 and ADC1 /EOC interrupts, as well as the SPI interrupt used
  * to communicate with the ADCs and SRs are taken by this library for
  * coordinating full sensor scan sweeps. Care must be taken that these
@@ -77,19 +80,20 @@
 
 /* Macro Definitions **********************************************************/
 
-#define PS_X_MIN 9
-#define PS_X_MAX 19
-#define PS_Y_MIN 9
-#define PS_Y_MAX 19
+#define PS_X_MIN 9  ///< min value along x-axis of sensor to check
+#define PS_X_MAX 19 ///< max value along x-axis of sensor to check
+#define PS_Y_MIN 9  ///< min value along y_axis of sensor to check
+#define PS_Y_MAX 19 ///< min value along y_axis of sensor to check
+
 #define NUM_PS_X_CHANS 28 ///< Number of x-position channels
 #define NUM_PS_Y_CHANS 24 ///< Number of y-position channels
 
 /// any reading, after compensated, less than this threshold is set to 0
-#define ZERO_THRESHOLD 40
-#define OVERSAMPLE_SIZE 5
-#define OVERSAMPLE_THRESHOLD 100
+#define ZERO_THRESHOLD 40        ///< zero threshold, \sa PS_scan_all()
+#define OVERSAMPLE_SIZE 5        ///< oversample rate, \sa PS_scan_all()
+#define OVERSAMPLE_THRESHOLD 100 ///< oversample threshold, \sa PS_scan_all()
 
-#define SIGN_BIT (0x0001 << 11)
+#define SIGN_BIT (0x0001 << 11)  ///< Sign bit of ADC conversion result
 
 /* Typedefs, Enums, and Structs ***********************************************/
 

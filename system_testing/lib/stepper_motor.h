@@ -65,9 +65,7 @@
 
 /* Include Directives *********************************************************/
 
-#include <avr/io.h>
 #include "tc_driver.h"
-#include "stepper_motor.h"
 #include "global.h"
 
 /* Macro Defintions ***********************************************************/

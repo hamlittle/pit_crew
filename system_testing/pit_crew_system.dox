@@ -1,0 +1,218 @@
+/** \mainpage Pit Crew Peach Pit Detector
+
+\section Introduction
+
+This page gives an overview of the full system as a unit. Detailed 
+documentation of each of the parts of the system can be found in the 
+approriately titled .c and .h files. All effort has been made to keep the 
+documentation up to date, however, the job of implementing and documenting 
+the full source code has been accomplished by a single member of the pit crew 
+team, which means that not all parts of the documentation are up to date.
+
+In order to run the system, a USB cable can be connected to the XMEGA A1 
+Development Board, and a serial port monitor, such as hyperterm, should be 
+connected to communicate with the virtual COM port which is opened by the 
+USB-UART gateway on the development board using a baud rate of 9600, no 
+parity bit, no flow control, and one stop bit.
+
+On initialization or reset, the microcontroller will print the help message 
+to the screen. This help message can be recalled with the ? command. To input 
+any command, type the command, followed by a carriage return (<c-enter> on 
+hyperterm). Also, this puts the controller in the default IDLE state. This is 
+the only state in which commands are accepted. All commands entered when the 
+system is not in the idle state, except for the brake command, will be 
+ignored until the current operation is finished.
+
+The brake command is initiated by sending a carriage return to the controller 
+without any leading or trailing characters. This command will stop the 
+current operation, if there is one ongoing, and put the machine in the idle 
+state. This is useful is something goes wrong, for example, during a move or 
+run, and the machine needs to be reset or adjust before being operated again.
+
+The system is implemented as a finite state machine, which is run 
+by the program's main loop. The valid states for the machine are enumerated 
+in PC_STATE_t. A brief description of each of the states, as well as 
+the valid commands which are accepted during the IDLE state, follow.
+
+\section FSM Finite State Machine States
+
+\subsection IDLE
+In this state, the machine is waiting for the operator to initiate a command.
+The valid commands are described in the documentation of the command_t
+struct in this file's accompanying header file.
+
+\subsection RETAIN
+In the retain state, the retaining ring is descending towards the peach.
+When either the retaining ring sensor detects that it has fully retained the
+peach, or if the retaining ring moves moves the distance set by
+#LA_RING_RETAIN_DEPTH without detecting a peach, the state will be advanced.
+If a peach is properly retained, the state will advance to engage. Otherwise
+it will advance to the release state.
+
+\subsection ENGAGE
+In the engage state, the needle carriage is lowered to a position where the
+needles are just above the surface of the peach. The machine is intelligent
+in that it knows the position of the retaining ring, and is able to adjust
+the total distance necessary to move the needle carriage in order to position
+the needles just above the peach surface appropriately.
+
+\subsection CHECK
+In the check state, the needle carriage is lowered at a constant rate so that
+the needles insert into the flesh of the peach until the bottom of the needle
+carriage is just shy of making contact with the top of the retaining ring.
+During this state, the pressure sensor is being constantly scanned. If any of
+the readings trigger a pit detection (either the absolute threshold or delta
+threshold is reached, see pressure_sensor.h), the state will immediately be
+advanced to the disengage state, and the detection of the pit will be
+communicated to the user through the terminal screen. If, however, no pit is
+detected by the time the needles have traveled the full insertion depth (set
+by #LA_NEEDLE_CHECK_DEPTH), the state will also be advanced to the disengage
+state, and the absence of a pit will be communicated to the user through the
+terminal screen.
+
+\subsection DISENGAGE
+In this state, the needle carriage is retracted to the home position.
+
+\subsection RELEASE
+In this state, the retaining ring is retracted to the home position.
+
+\subsection PASS
+This is currently a theoretical state, as no peach separation mechanism has
+been designed into the system. In this state, the peaches in which a pit was
+detected would be separated into the dirty line, whereas the peaches with
+no pits would be passed along into the clean" line.
+
+\subsection STOP
+This state can only be entered when the safety cover of the machine is
+removed. In this state, the machine will freeze the motors in whatever
+position they are in, and will not receive any new commands until the safety
+lid is returned. When the cover is placed back on the machine, both linear
+actuators will be homed, at which point the machine will be ready to accept
+any new valid commands.
+
+\section COMMANDS Recognized Commands
+In order to input a command through the serial port monitor, the command 
+invocation, including any variable data, must be entered as described, followed 
+by a carriage return. On hyperterminal, a carriage return may be entered by
+typing <c-enter> (control+enter). This may vary according to what serial 
+monitor is being used. Note that if an invalid command is entered, the help 
+message will be printed. Additionally, any characters entered after the end of 
+the command, and before the carriage return, will be stripped from the command, 
+so commands cannot be chained together; they must be entered one at a time.
+
+\subsection MOVE move distance
+command invocation: \verbatim m<1,2> [dist] 
+                    \endverbatim
+moves the needle cariage (1) or retaining ring (2) the given distance, in units 
+of 0.001 in (a value of 1000 moves the given actuator 1.000 in). This command 
+uses the acceleration, deceleration, and max speed parameters set by the 
+following commands. Also, note that the positive direction is down towards the 
+peach, and a negative value here will move the actuator upwards away from the 
+peach, and towards the home position.
+
+\subsection ACCEL set acceleration
+command invocation: \verbatim a<1,2> [accel] 
+                    \endverbatim
+set the needle cariage (1) or retaining ring (2) the acceleration for subsequent
+move commands, in units of 0.001 in/s^2 (a value of 1000 sets the acceleration 
+to 1.000 in/s^2).
+
+\subsection DECEL set deceleration
+command invocation: \verbatim d<1,2> [decel] 
+                    \endverbatim
+set the needle cariage (1) or retaining ring (2) the deceleration for subsequent
+move commands, in units of 0.001 in/s^2 (a value of 1000 sets the deceleration 
+to 1.000 in/s^2).
+
+\subsection SPEED set max speed
+command invocation: \verbatim s<1,2> [speed] 
+                    \endverbatim
+set the needle cariage (1) or retaining ring (2) max speed for subsequent
+move commands, in units of 0.001 in/s (a value of 1000 sets the max speed 
+to 1.000 in/s).
+
+\subsection MOVE_WITH move with given profile
+command invocation: \verbatim move<1,2> [steps] [accel] [decel] [speed] 
+                    \endverbatim
+Move the needle carriage (1) or retaining ring (2) with the given velocity 
+profile. The units of each of these values are the same as what is documented 
+for each of the individual commands. This command is simply a convenience 
+command so that a particular move can be initiated in one step without having to
+change each setting individually. Note that the default values for all 
+subsequent move commands will now be set to the values given here.
+
+\subsection CAL calibrate pressure sensor
+command invocation: \verbatim c 
+                    \endverbatim
+This command performs a calibration of the pressure sensor, and prints out the 
+calibration values gathered on the screen. This is useful if the machine is 
+being manually operated before performing a pressure sensor scan, as without 
+calibrating the sensor first, the values returned from a sensor scan are 
+unreliable. If the system is initiated to perform a fully system run using the 
+'run' command, this calibration is performed automatically.
+
+\subsection SCAN scan pressure sensor
+command invocation: \verbatim p 
+                    \endverbatim
+Scan the pressure sensor, and print out the calibration compensated results. 
+This is useful when operating the machine manually, to see the values the 
+pressure sensor is "seeing" in order to set the absolute and delta threshold 
+values.
+
+\subsection ABS_THRESH set absolute threshold
+command invocation: \verbatim at [thresh]
+                    \endverbatim
+Set the absolute threshold for pit detection. The absolute threshold is the 
+compensated pressure sensor value the machine will consider being high enough to
+indicate a pit being present in the peach. Any value read by the sensor, after 
+compensation, will trigger a pit having been detected.
+
+\subsection DELTA_THRESH set delta threshold
+command invocation: \verbatim dt [thresh]
+                    \endverbatim
+Set the delta threshold for pit detection. The delta threshold is the change in 
+compenstated pressure sensor value which the machine will consider being high 
+enough to indicate a pit being present in the peach. The pressure sensor 
+remembers the compensated valuse from the last scan it performed. When any of 
+the values in the pressure sensor's scan buffer increase by an amount greater 
+than this value, it will trigger a pit having been detected.
+ 
+\subsection RUN perform full system run
+command invocation: \verbatim run
+                    \endverbatim
+Perform a full system run. A full system run starts by setting the state to 
+retaining, and the sequence of events from there is described by the Finite 
+State Machine section above.
+
+\subsection RUNM perform full system run for matlab visualization
+command invocation: \verbatim runm
+                    \endverbatim
+This command is identical to the 'run' command, except that during the CHECK 
+state, the pressure sensor readings are constantly printed out to the screen. 
+This allows the accompanying matlab script to parse the data from the sensor, 
+plot each reading as a surface graph, and render the plotted readings in order 
+as a movie. This command is intended for show, so the user can visualize what 
+the pressure sensor was "seeing" as it was checking the peach.
+
+\subsection HOME home the linear actuators
+command invocation: \verbatim h
+                    \endverbatim
+This command homes both linear actuators. This is performed automatically on 
+initialization or reset, but should also be performed before any 'run' or 'runm'
+command, or these commands will not run the system properly.
+
+\subsection HELP show help message
+command invocation: \verbatim ?
+                    \endverbatim
+This command prints the help messages, which shows the shorthand version of the 
+documentation shown here.
+
+\subsection BRAKE stop current operation
+command invocation: \verbatim <\n>
+                    \endverbatim
+Entering a carriage return (hyperterm: <c-enter>) will halt the current move, or
+if the system is set in the run state, will halt the run and stop the linear 
+actuators in their current position. If the machine was in the running state, 
+actuators should be homed with the 'h' command before a new run is initiated.
+
+*/

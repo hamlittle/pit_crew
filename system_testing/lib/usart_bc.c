@@ -217,7 +217,9 @@ static void redirect_stdout_to_BC(void) {
  * be present to conform to the putchar() format specified in stdio.h.
  *
  * \param[in] c the character to send
- * \param[in] stream the file stream to print to (ignored) */
+ * \param[in] stream the file stream to print to (ignored)
+ *
+ * \return 0, to conform to stdout stream requirements */
 static int USART_BC_putchar(char c, FILE *stream)
 {
    if (c == '\n') {

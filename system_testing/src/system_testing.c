@@ -1,14 +1,18 @@
-/** \file expo_demo.c
+/** \file system_testing.c
  *
- * \brief System software for demoing at the senior project expo.
+ * \brief Main project for testing the fully operational system
  *
- * This test follows directly from AVR446: Linear Speed Control of Stepper
- * LA_needles. This test is simply a port of the code provided with this App
- * Note to
- * the Xmega Platform. On startup, a help menu is presented which explains how
- * to run the tests.
+ * This file contains the main peach pit detection algorithm implemented in the
+ * main loop. The main loop is broken up as a finite state machine. Each state
+ * is described in detail in the following sections. In order to run the system,
+ * a computer should be connected to the XMEGA A1 development board through the
+ * USB line, and a terminal program set to communicate with the board at 9600
+ * baud, no parity, 1 stop bit, and no flow control should be started in order
+ * to command the machine.
  *
- * \todo TODO test_limit_switches.c documentation
+ * The finite state machine implemented in the main loop is documented in
+ * \ref index.
+ *
  *
  * \author Hamilton Little
  *         hamilton.little@gmail.com
@@ -30,14 +34,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. \endverbatim */
 
-/* Include Directives *********************************************************/
+/* Include Directives*********************************************************/
 
-#include "expo_demo.h"
+#include "system_testing.h"
 
-/* Global Data ****************************************************************/
+/* Function Prototypes ********************************************************/
+
+/** \name Board Setup Functions */
+///@{
+static void setup_clocks(void);
+static void setup_LEDs(void);
+static void setup_safety_switch(void);
+static void setup_retain_sensor(void);
+static void setup_pressure_sensor(PS_t *pressure_sensor);
+static void setup_USART_BC(void);
+static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator);
+///@}
+
+INLINE void set_state(PC_t *machine, PC_state_t state);
+static void show_help_message(void);
+static void show_motor_data(const char *name, int16_t position,
+                            uint16_t acceleration, uint16_t deceleration,
+                            uint16_t speed, int16_t dist);
+static void show_threshold_data(uint16_t abs_threshold,
+                                uint16_t delta_threshold);
+static command_t parse_command(int16_t *steps1, uint16_t *accel1,
+                               uint16_t *decel1, uint16_t *speed1,
+                               int16_t *steps2, uint16_t *accel2,
+                               uint16_t *decel2, uint16_t *speed2,
+                               uint16_t *abs_threshold,
+                               uint16_t *delta_threshold);
+static uint8_t find_next_param(char *command_buffer, uint8_t start_position);
 
 
-/* Function Definitions *******************************************************/
+/* Function Definitions*******************************************************/
 
 /** \brief Initialize and set cpu and periheral clocks.
  *
@@ -57,10 +87,11 @@ static void setup_clocks(void) {
    // set up external 32KHz oscillator (NOTE: first param is ignored)
    CLKSYS_XOSC_Config(OSC_FRQRANGE_04TO2_gc, false, OSC_XOSCSEL_32KHz_gc);
 
-   // set internal 32KHz oscillator as source for DFLL and autocalibrate 32MHz
+   // set internal 32KHz oscillator as source for DFLL and autocalibrate
+   // 32MHz
    CLKSYS_Enable(OSC_XOSCEN_bm);                          //enable
-   do { nop(); } while (!CLKSYS_IsReady(OSC_XOSCRDY_bm)); // wait til stable
-   CLKSYS_AutoCalibration_Enable(OSC_RC32MCREF_bm, true); // true == ext 32KHz
+   do { nop(); } while (!CLKSYS_IsReady(OSC_XOSCRDY_bm)); //wait til stable
+   CLKSYS_AutoCalibration_Enable(OSC_RC32MCREF_bm, true); //true == ext 32KHz
 
    // disable unused oscillators (internal 2MHz and 32KHz oscillators)
    CLKSYS_Disable(OSC_RC2MEN_bm | OSC_RC32KEN_bm);
@@ -76,26 +107,6 @@ static void setup_LEDs(void) {
    PORTCFG.MPCMASK = 0xff;             // set for all pins on port E...
    LED_PORT.PIN0CTRL |= PORT_INVEN_bm;  // inverted output (set hi turns on led)
    LED_PORT.OUTCLR = 0xff;              // turn all leds off
-}
-
-/** \brief Sets up the switches.
- *
- * Switches on the board are normally open, and pull to ground when pushed.
- * Inverted input is enabled, so the IN register will read high if the switch is
- * pushed.
- *
- * \param[in] switch_mask which switches to enable. */
-static void setup_switches(uint8_t switch_mask) {
-   uint8_t maskL = switch_mask & SWITCH_PORTL_MASK_gm;
-   uint8_t maskH = switch_mask >> SWITCH_PORTH_OFFSET;
-
-   SWITCH_PORTL.DIR &= ~maskL;
-   PORTCFG.MPCMASK = maskL;
-   SWITCH_PORTL.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;
-
-   SWITCH_PORTH.DIR &= ~maskH;
-   PORTCFG.MPCMASK = maskH;
-   SWITCH_PORTH.PIN0CTRL = PORT_OPC_PULLUP_gc | PORT_INVEN_bm;
 }
 
 /** \brief Sets up the safety switch.
@@ -144,14 +155,14 @@ static void setup_USART_BC(void) {
    USART_BC_init();
 }
 
-/** \brief Initializes the stepper motors.
+/** \brief Initializes the linear actuators.
  *
- * Calls into the stepper_motor.c library to initialize two to linear
+ * Calls into the linear_actuator.c library to initialize two to linear
  * actuators.  The pin values and timers used for each motor are defined in
  * this file's header file.
  *
- * \param[in] needle_motor The needle motor to initialize
- * \param[in] ring_motor The ring motor to initialize */
+ * \param[in] needle_actuator The needle motor to initialize
+ * \param[in] ring_actuator The ring motor to initialize */
 static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator) {
    LA_init(needle_actuator, LA_NEEDLE_PITCH, &LA_port, LA_NEEDLE_DISABLE_bm,
            LA_NEEDLE_DIRECTION_bm, LA_NEEDLE_STEP_bm, LA_NEEDLE_TIMER);
@@ -168,30 +179,28 @@ static void setup_linear_actuators(LA_t *needle_actuator, LA_t *ring_actuator) {
  * \return never returns, test loop runs ad infinitum. */
 int main(void) {
    PC_t machine;
-   uint8_t switch_mask = 0x00;
 
-   int16_t steps1 = 1000;
-   int16_t steps2 = 1000;
-   uint16_t accel1 = 500;
-   uint16_t accel2 = 500;
-   uint16_t decel1 = 500;
-   uint16_t decel2 = 500;
-   uint16_t speed1 = 2000;
-   uint16_t speed2 = 2000;
+   int16_t steps1 = 0;
+   int16_t steps2 = 0;
+   uint16_t accel1 = LA_NEEDLE_DFLT_ACCEL;
+   uint16_t accel2 = LA_RING_DFLT_ACCEL;
+   uint16_t decel1 = LA_NEEDLE_DFLT_DECEL;
+   uint16_t decel2 = LA_RING_DFLT_DECEL;
+   uint16_t speed1 = LA_NEEDLE_DFLT_SPEED;
+   uint16_t speed2 = LA_RING_DFLT_SPEED;
 
    bool move_made = false;
-   bool stop_printed = false;
+   /* bool stop_printed = false; */
 
    command_t command;
    bool matlab = false;
-   uint16_t abs_threshold = 1100;
-   uint16_t delta_threshold = 600;
+   uint16_t abs_threshold = PS_ABS_THRESHOLD_DFLT;
+   uint16_t delta_threshold = PS_DELTA_THRESHOLD_DFLT;
 
    /* call all of the setup_* functions */
    cli();
    setup_clocks();
    setup_LEDs();
-   setup_switches(switch_mask);
    setup_safety_switch();
    setup_retain_sensor();
    setup_pressure_sensor(&(machine.pressure_sensor));
@@ -205,15 +214,18 @@ int main(void) {
    show_help_message();
 
    /* show the current state of the linear actuator */
-   show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                   accel1, decel1, speed1, steps1, abs_threshold,
-                   delta_threshold);
-   show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                   accel2, decel2, speed2, steps2, abs_threshold,
-                   delta_threshold);
+   show_motor_data(LA_needle_name,
+                   LA_get_position(&(machine.needle_carriage)),
+                   accel1, decel1, speed1, steps1);
+   show_motor_data(LA_ring_name,
+                   LA_get_position(&(machine.retaining_ring)),
+                   accel2, decel2, speed2, steps2);
+   show_threshold_data(abs_threshold, delta_threshold);
 
+   /* perform an initial pressure sensor calibration */
    PS_calibrate(&machine.pressure_sensor);
 
+   /* home both of the linear actuators */
    LA_go_to_home(&machine.needle_carriage);
    LA_go_to_home(&machine.retaining_ring);
 
@@ -235,6 +247,7 @@ int main(void) {
                case RUN_MATLAB:
                   matlab = true;
                   printf("movie_begin\n");
+
                case RUN:
                   printf("Beginning system run\n");
                   set_state(&machine, RETAIN);
@@ -273,6 +286,8 @@ int main(void) {
                case ACCEL2:
                case DECEL2:
                case SPEED2:
+               case ABS_THRESHOLD:
+               case DELTA_THRESHOLD:
                   printf("\n>");
                   break;
 
@@ -290,12 +305,13 @@ int main(void) {
 
                case HELP:
                   show_help_message();
-                  show_motor_data(LA_get_position(&(machine.needle_carriage)),
-                                  accel1, decel1, speed1, steps1, abs_threshold,
-                                  delta_threshold);
-                  show_motor_data(LA_get_position(&(machine.retaining_ring)),
-                                  accel2, decel2, speed2, steps2, abs_threshold,
-                                  delta_threshold);
+                  show_motor_data(LA_needle_name,
+                                  LA_get_position(&(machine.needle_carriage)),
+                                  accel1, decel1, speed1, steps1);
+                  show_motor_data(LA_ring_name,
+                                  LA_get_position(&(machine.retaining_ring)),
+                                  accel2, decel2, speed2, steps2);
+                  show_threshold_data(abs_threshold, delta_threshold);
                   printf("\n>");
                   break;
 
@@ -313,6 +329,13 @@ int main(void) {
                        LA_RING_RETAIN_ACCEL, LA_RING_RETAIN_DECEL,
                        LA_RING_RETAIN_SPEED);
                move_made = true;
+            }
+            if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
+                              &accel2, &decel2, &speed2, &abs_threshold,
+                              &delta_threshold)
+                == BRAKE) {
+
+               set_state(&machine, STOP);
             }
             if (RETAINED()) {
                LA_brake(&machine.retaining_ring);
@@ -443,10 +466,8 @@ int main(void) {
             /*    stop_printed = false; */
             /* } */
             break;
-
       }
-
-   }//end while (1)
+   }
 }
 
 /** \brief Sets the new state of the machine.
@@ -458,11 +479,11 @@ int main(void) {
  *
  * \param[in] machine The machine to set the state
  * \param[in] state The new state to set */
-INLINE void set_state(PC_t *machine, PC_STATE_t state) {
+INLINE void set_state(PC_t *machine, PC_state_t state) {
    machine->state = state;
 }
 
-/*! \brief Sends help message.
+/** \brief Shows the help message
  *
  *  Outputs help message.
  */
@@ -471,29 +492,55 @@ static void show_help_message(void)
    printf("%s", help_message);
 }
 
-/*! \brief Sends out data.
+/** \brief Shows the data for the given motor.
  *
  *  Outputs the values of the data you can control by serial interface
- *  and the current position of the stepper LA_needle.
+ *  and the current position of the stepper linear actuator.
  *
- *  \param acceleration Accelration setting.
- *  \param deceleration Deceleration setting.
- *  \param speed Speed setting.
- *  \param steps Position of the stepper LA_needle.
+ *  \param[in] name Name of the motor
+ *  \param[in] position Current position of the motor
+ *  \param[in] acceleration acceleration setting
+ *  \param[in] deceleration Deceleration setting
+ *  \param[in] speed Speed setting
+ *  \param[in] dist distance from last move
  */
-static void show_motor_data(int16_t position, uint16_t acceleration,
-                            uint16_t deceleration, uint16_t speed,
-                            int16_t steps, uint16_t abs_threshold, uint16_t
-                            delta_threshold) {
+static void show_motor_data(const char *name, int16_t position,
+                            uint16_t acceleration, uint16_t deceleration,
+                            uint16_t speed, int16_t dist) {
 
    printf("\n"); // do not remove, solves unknown bug
-   printf("LA_needle pos: %d    a: %u    d: %u    s: %u    m: %d    "
-          "at: %u    dt: %u\n",
-          position, acceleration, deceleration, speed, steps, abs_threshold,
-          delta_threshold);
+   printf("%s: pos: %d    accel: %u    decel: %u    speed: %u    last_dist: %d",
+          name, position, acceleration, deceleration, speed, dist);
 }
 
+/** \brief Shows the threshold data.
+ *
+ * \param[in] abs_threshold the absolute threshold
+ * \param[in] delta_threshold the delta threshold */
+static void show_threshold_data(uint16_t abs_threshold,
+                                uint16_t delta_threshold) {
+   printf("\n"); // do not remove, solves unknown bug
+   printf("abs: %u    delta: %u\n", abs_threshold, delta_threshold);
+}
 
+/** \brief Parses the UART buffer for a new command, and sets the parameter to
+ * the given parsed value, if applicable and command is valid.
+ *
+ * Once the command has been parsed, any remaining data in the buffer is
+ * flushed.
+ *
+ * \param[out] steps1 Needle carriage move distance
+ * \param[out] accel1 Needle carriage move accel
+ * \param[out] decel1 Needle carriage move decel
+ * \param[out] speed1 Needle carriage move speed
+ * \param[out] steps2 Retaining Ring move distance
+ * \param[out] accel2 Retaining Ring move accel
+ * \param[out] decel2 Retaining Ring move decel
+ * \param[out] speed2 Retaining Ring move speed
+ * \param[out] abs_threshold absolute threshold to use
+ * \param[out] delta_threshold delta theshold to use
+ *
+ * \return The parsed command type, one of the command_t commands */
 static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                uint16_t *decel1, uint16_t *speed1,
                                int16_t *steps2, uint16_t *accel2,
@@ -526,7 +573,7 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
             if (command_buffer[command_ndx++] == ' '){
                // ...new threshold given
                *abs_threshold = atoi((const char *)command_buffer+command_ndx);
-               command = HELP;
+               command = ABS_THRESHOLD;
             }
          }
       }
@@ -537,7 +584,7 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                // ...new threshold given
                *delta_threshold = atoi((const char *)
                                        command_buffer+command_ndx);
-               command = HELP;
+               command = DELTA_THRESHOLD;
             }
          }
       }
@@ -672,13 +719,13 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
             }
          }
       }
-      else if (command_buffer[command_ndx] == 'c'){// hyper terminal sends \r\n
+      else if (command_buffer[command_ndx] == 'c') {
          command = CAL;
       }
-      else if (command_buffer[command_ndx] == 'p'){// hyper terminal sends \r\n
+      else if (command_buffer[command_ndx] == 'p') {
          command = SCAN;
       }
-      else if (command_buffer[command_ndx] == '?'){
+      else if (command_buffer[command_ndx] == '?') {
          command = HELP;
       }
       else {
@@ -692,6 +739,12 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
    return command;
 }
 
+/** \brief Finds the next param in the given command buffer string.
+ *
+ * \param[in] command_buffer the string to search through for the next param
+ * \param[in] start_position the index value to start at in the string
+ *
+ * \return index of next parameter in the string */
 static uint8_t find_next_param(char *command_buffer, uint8_t start_position)
 {
    uint8_t ndx = start_position;

@@ -3,7 +3,19 @@
  *
  * \brief Linear Actuator wrapper library for the stepper motor library.
  *
- * \todo TODO document linear_actuator.h file
+ * This library acts as a wrapper for the stepper motor library. The stepper
+ * motor library is the one that does all the heavy lifting, this library simply
+ * provides a more convenient interface to it. This library contains a copy of
+ * all of the public functions of the stepper motor library, except that all of
+ * the parameters taken by the functions of this library are in linear distance
+ * units, whereas the stepper motor library expects function parameters in terms
+ * of rotational units.
+ *
+ * For a full description of how to use the library, the documentation of
+ * stepper_motor.h can be used. The same initialization sequence should be used,
+ * and additionally, the functionality implemented by that library is mirrored
+ * here, by replacing the SM_* function call with the corresponding LA_*
+ * function call from this library.
  *
  * \note For the linear actuator pitches of 0.5in for the needle carriage, and
  * 0.125 in for the retaining ring, the limits imposed on the distance,
