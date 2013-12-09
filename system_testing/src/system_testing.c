@@ -63,7 +63,8 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                int16_t *steps2, uint16_t *accel2,
                                uint16_t *decel2, uint16_t *speed2,
                                uint16_t *abs_threshold,
-                               uint16_t *delta_threshold);
+                               uint16_t *delta_threshold,
+                               uint8_t *run_count);
 static uint8_t find_next_param(char *command_buffer, uint8_t start_position);
 
 
@@ -190,12 +191,17 @@ int main(void) {
    uint16_t speed2 = LA_RING_DFLT_SPEED;
 
    bool move_made = false;
+   bool pit_found = false;
    /* bool stop_printed = false; */
 
    command_t command;
    bool matlab = false;
+
    uint16_t abs_threshold = PS_ABS_THRESHOLD_DFLT;
    uint16_t delta_threshold = PS_DELTA_THRESHOLD_DFLT;
+
+   uint8_t run_counter = 0;
+   uint8_t run_ndx = 0;
 
    /* call all of the setup_* functions */
    cli();
@@ -203,10 +209,10 @@ int main(void) {
    setup_LEDs();
    setup_safety_switch();
    setup_retain_sensor();
-   setup_pressure_sensor(&(machine.pressure_sensor));
+   setup_pressure_sensor(&machine.pressure_sensor);
    setup_USART_BC();
-   setup_linear_actuators(&(machine.needle_carriage),
-                          &(machine.retaining_ring));
+   setup_linear_actuators(&machine.needle_carriage,
+                          &machine.retaining_ring);
    set_state(&machine, IDLE);
    sei();
 
@@ -215,10 +221,10 @@ int main(void) {
 
    /* show the current state of the linear actuator */
    show_motor_data(LA_needle_name,
-                   LA_get_position(&(machine.needle_carriage)),
+                   LA_get_position(&machine.needle_carriage),
                    accel1, decel1, speed1, steps1);
    show_motor_data(LA_ring_name,
-                   LA_get_position(&(machine.retaining_ring)),
+                   LA_get_position(&machine.retaining_ring),
                    accel2, decel2, speed2, steps2);
    show_threshold_data(abs_threshold, delta_threshold);
 
@@ -238,10 +244,37 @@ int main(void) {
       switch (get_state(&machine)) {
 
          case IDLE:
+            if (run_ndx < run_counter) {
+               while (LA_get_position(&machine.needle_carriage) != 0 ||
+                      LA_get_position(&machine.retaining_ring) != 0) {
+                  if (parse_command(&steps1, &accel1, &decel1, &speed1,
+                                    &steps2, &accel2, &decel2, &speed2,
+                                    &abs_threshold, &delta_threshold,
+                                    &run_counter) == BRAKE) {
+                     set_state(&machine, STOP);
+                     run_counter = 0;
+                     run_ndx = 0;
+                  }
+               }
+               if (run_ndx < run_counter) {
+                  LA_brake(&machine.needle_carriage);
+                  LA_brake(&machine.retaining_ring);
+                  printf("Beginning run %u of %u\n", ++run_ndx, run_counter);
+                  set_state(&machine, RETAIN);
+               }
+            }
+            else {
+               run_counter = 0;
+               run_ndx = 0;
+            }
+
             command = parse_command(&steps1, &accel1, &decel1, &speed1,
                                     &steps2, &accel2, &decel2, &speed2,
-                                    &abs_threshold, &delta_threshold);
+                                    &abs_threshold, &delta_threshold,
+                                    &run_counter);
             matlab = false;
+            move_made = false;
+            pit_found = false;
 
             switch(command) {
                case RUN_MATLAB:
@@ -249,9 +282,9 @@ int main(void) {
                   printf("movie_begin\n");
 
                case RUN:
-                  printf("Beginning system run\n");
-                  set_state(&machine, RETAIN);
-                  move_made = false;
+                  /* run counter is updated by call to parse_command, so next
+                   * time through loop, run will begin */
+                  printf("Running system %u times\n", run_counter);
                   break;
 
                case HOME:
@@ -332,7 +365,7 @@ int main(void) {
             }
             if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
                               &accel2, &decel2, &speed2, &abs_threshold,
-                              &delta_threshold)
+                              &delta_threshold, &run_counter)
                 == BRAKE) {
 
                set_state(&machine, STOP);
@@ -365,7 +398,7 @@ int main(void) {
 
             if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
                               &accel2, &decel2, &speed2, &abs_threshold,
-                              &delta_threshold)
+                              &delta_threshold, &run_counter)
                 == BRAKE) {
 
                set_state(&machine, STOP);
@@ -403,7 +436,7 @@ int main(void) {
 
                if (parse_command(&steps1, &accel1, &decel1, &speed1, &steps2,
                                  &accel2, &decel2, &speed2, &abs_threshold,
-                                 &delta_threshold)
+                                 &delta_threshold, &run_counter)
                    == BRAKE) {
 
                   set_state(&machine, STOP);
@@ -414,7 +447,7 @@ int main(void) {
                   if (PS_check(&machine.pressure_sensor, abs_threshold,
                                delta_threshold)) {
                      set_state(&machine, DISENGAGE);
-                     printf("\n\n\n\n   !!!!!!PIT!!!!!!\n\n\n\n");
+                     pit_found = true;
                   }
                   if (matlab) {
                      printf("pressure_sensor_begin\n");
@@ -425,7 +458,7 @@ int main(void) {
             }
             else {
                set_state(&machine, DISENGAGE);
-               printf("\n\n\n\n             NO PIT\n\n\n\n");
+               pit_found = false;
             }
             break;
 
@@ -442,11 +475,18 @@ int main(void) {
          case RELEASE:
             printf("Releasing Peach\n");
             LA_go_to_home(&machine.retaining_ring);
-            set_state(&machine, IDLE);
+            set_state(&machine, PASS);
             break;
 
          case PASS:
-            printf("Passing/Rejecting Peach\n");
+            if (pit_found) {
+               printf("\n\n\n\t\t\t!!!!!!PIT!!!!!!\n\n\n");
+            }
+            else {
+               printf("\n\n\n\t\t\tNO PIT\n\n\n");
+            }
+            pit_found = false;
+            set_state(&machine, IDLE);
             break;
 
          case STOP:
@@ -457,6 +497,9 @@ int main(void) {
             printf("Machine stopped\n");
             LA_brake(&machine.needle_carriage);
             LA_brake(&machine.retaining_ring);
+            run_counter = 0;
+            run_ndx = 0;
+            pit_found = false;
             set_state(&machine, IDLE);
             /* if (!SS_OPEN()) { */
             /*    printf("Safety Lid Replaced: Resetting Machine\n"); */
@@ -539,6 +582,7 @@ static void show_threshold_data(uint16_t abs_threshold,
  * \param[out] speed2 Retaining Ring move speed
  * \param[out] abs_threshold absolute threshold to use
  * \param[out] delta_threshold delta theshold to use
+ * \param[out] run_count The number of runs requested
  *
  * \return The parsed command type, one of the command_t commands */
 static command_t parse_command(int16_t *steps1, uint16_t *accel1,
@@ -546,7 +590,8 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
                                int16_t *steps2, uint16_t *accel2,
                                uint16_t *decel2, uint16_t *speed2,
                                uint16_t *abs_threshold,
-                               uint16_t *delta_threshold) {
+                               uint16_t *delta_threshold,
+                               uint8_t *run_count) {
    char command_buffer[USART_RX_BUFFER_SIZE];
    command_t command = NONE;
    uint8_t command_ndx = 0;
@@ -558,10 +603,11 @@ static command_t parse_command(int16_t *steps1, uint16_t *accel1,
          ++command_ndx;
          if (command_buffer[command_ndx++] == 'u') {
             if (command_buffer[command_ndx++] == 'n') {
-               if (command_buffer[command_ndx++] == 'm') {
+               if (command_buffer[command_ndx] == 'm') {
                   command = RUN_MATLAB;
                }
-               else {
+               else if (command_buffer[command_ndx++] == ' ') {
+                  *run_count = atoi((const char *)command_buffer+command_ndx);
                   command = RUN;
                }
             }

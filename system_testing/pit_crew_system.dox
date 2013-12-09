@@ -178,11 +178,14 @@ the values in the pressure sensor's scan buffer increase by an amount greater
 than this value, it will trigger a pit having been detected.
  
 \subsection RUN perform full system run
-command invocation: \verbatim run
+command invocation: \verbatim run [count]
                     \endverbatim
 Perform a full system run. A full system run starts by setting the state to 
 retaining, and the sequence of events from there is described by the Finite 
-State Machine section above.
+State Machine section above. The machine will check the loaded peach count 
+times. This is useful for repeatedly running the machine during testing. 
+\verbatim run 1 \endverbatim will run the machine once, a count of two will run 
+it twice, etc.
 
 \subsection RUNM perform full system run for matlab visualization
 command invocation: \verbatim runm

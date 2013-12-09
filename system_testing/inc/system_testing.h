@@ -152,7 +152,7 @@ const char *help_message =
 "p - read pressure sensor\n\r"
 "at - set pressure sensor absolute threshold\n\r"
 "dt - set pressure sensor delta threshold\n\r"
-"run - perform full system run\n\r"
+"run [count] - perform full system run count times\n\r"
 "runm - perform full system run, print data for matlab script\n\r"
 "<cr> - stop the current operation\n\r"
 "1 is the needle carriage, 2 is the retaining ring, and + is down\n\r"
@@ -174,21 +174,21 @@ const char *LA_ring_name = "Retaining Ring";
  *
  * The following commands are recognized by the machine at the terminal
  * interface, and are further documented in the Introduction:
- * + 'm1' - move needle carriage (units 0.001 in, + is towards peach)
- * + 'm2' - move retaining ring (units: 0.001in, + is towards peach)
- * + 'a1' - set needle carriage accel (units: 0.001in/s^2)
- * + 'a2' - set retaining ring accel (units: 0.001in/s^2)
- * + 'd1' - set needle carriage decel (units: 0.001in/s^2)
- * + 'd2' - set retaining ring decel (units: 0.001in/s^2)
- * + 's1' - set needle carriage max speed (units: 0.001in/s)
- * + 's2' - set retaining ring max speed (units: 0.001in/s)
+ * + 'm1 [dist]' - move needle carriage (units 0.001 in, + is towards peach)
+ * + 'm2 [dist]' - move retaining ring (units: 0.001in, + is towards peach)
+ * + 'a1 [accel]' - set needle carriage accel (units: 0.001in/s^2)
+ * + 'a2 [accel]' - set retaining ring accel (units: 0.001in/s^2)
+ * + 'd1 [decel]' - set needle carriage decel (units: 0.001in/s^2)
+ * + 'd2 [decel]' - set retaining ring decel (units: 0.001in/s^2)
+ * + 's1 [speed]' - set needle carriage max speed (units: 0.001in/s)
+ * + 's2 [speed]' - set retaining ring max speed (units: 0.001in/s)
  * + 'move1 [steps] [accel] [decel] [speed]' move needle carriage with given
  * + 'move2 [steps] [accel] [decel] [speed]' move retaining ring with given
  * + 'c' - calibrate pressure sensor, print out calibration data
  * + 'p' - scan sensor, and print out calibration compensated results
  * + 'at' - set pressure sensor absolute threshold
  * + 'dt' - set pressure sensor delta threshold
- * + 'run' - perform a full system run
+ * + 'run [count]' - perform a full system run count times
  * + 'runm' - perform a full system run, print sensor data for matlab
  * + 'h' - home both needle carriage and retaining ring
  * + '?' - print the help message
@@ -198,7 +198,9 @@ const char *LA_ring_name = "Retaining Ring";
  * commands. The 'run' command starts a full system run. This includes the
  * automatic retention of the peach by the retaining ring, engaging the needles,
  * checking for pits, disengaging the needles, releasing the peach, and finally
- * passing or rejecting the peach based on whether any pits were found.
+ * passing or rejecting the peach based on whether any pits were found. The
+ * machine will cycle count times, so run 1 will run the machine once, run 2
+ * will run it twice, etc.
  *
  * The 'runm' command similarly performs a full system run. However, at the
  * check stage, the needles are moved much more slowly. This is because while
@@ -227,7 +229,7 @@ typedef enum command_types {
    SCAN,            ///< scan the sensor
    ABS_THRESHOLD,   ///< set the absolute threshold
    DELTA_THRESHOLD, ///< set the delta threshold
-   RUN,             ///< run the full system, print out sensor readings
+   RUN,             ///< run the full system count times
    RUN_MATLAB,      ///< run for matlab
    HOME,            ///< reset both motors to home
    BRAKE,           ///< stop both motors
