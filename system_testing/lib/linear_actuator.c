@@ -141,5 +141,7 @@ void LA_go_to_home(LA_t *actuator) {
 
    /* just move a distance we know the limit switch is within
     * motor will stop when it hits it */
+   /* but first, set the position as it it really were 4 inches down */
+   actuator->motor.position = 4000 / actuator->pitch * SPR;
    LA_move(actuator, -4000, 1000, 1000, 2000);
 }

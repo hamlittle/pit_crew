@@ -274,14 +274,14 @@ void PS_print_compensation_buffer(PS_t *pressure_sensor) {
  * \param[in] delta_threshold The change from last reading threshold
  *
  * \return true if any value was above the threshold, otherwise false */
-bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold, uint16_t
-              delta_threshold) {
+PS_check_status PS_check(PS_t *pressure_sensor, uint16_t abs_threshold, uint16_t
+                         delta_threshold) {
    uint8_t x_ndx, y_ndx;
 
    for (y_ndx = PS_Y_MIN; y_ndx < PS_Y_MAX; ++y_ndx) {
       for (x_ndx = PS_X_MIN; x_ndx < PS_X_MAX; ++x_ndx) {
          if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >= abs_threshold) {
-            return true;
+            return ABS;
          }
          if (pressure_sensor->scan_buffer[y_ndx][x_ndx] >
              pressure_sensor->check_buffer[y_ndx][x_ndx]) {
@@ -289,13 +289,13 @@ bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold, uint16_t
                  pressure_sensor->check_buffer[y_ndx][x_ndx]
                  >= delta_threshold) &&
                 (pressure_sensor->check_buffer[y_ndx][x_ndx] != 0)) {
-               return true;
+               return DELTA;
             }
          }
       }
    }
 
-   return false;
+   return NO;
 }
 
 /* Private Function Definitions ***********************************************/

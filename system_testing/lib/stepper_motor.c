@@ -90,7 +90,7 @@ void SM_init(SM_t *motor, PORT_t *port, uint8_t DISABLE_bm,
    motor->DIRECTION_bm = DIRECTION_bm;
    motor->STEP_bm = STEP_bm;
    motor->timer = timer;
-   motor->position = 30000; // so the motors can be homed on initialization
+   motor->position = 0;
 
 
    /* initialize IO pins */

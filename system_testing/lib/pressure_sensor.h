@@ -111,6 +111,13 @@ typedef struct pressure_sensor_struct  {
    uint16_t check_buffer[NUM_PS_Y_CHANS][NUM_PS_X_CHANS];
 } PS_t;
 
+/** \brief The return values from PS_check.
+ *
+ * NO - Neither the absolute nor delta thresholds were exceeded.
+ * ABS - The delta threshold was exceeded
+ * DELTA - The delta theshold was exceeded */
+typedef enum PS_check_ret_vals { NO, ABS, DELTA } PS_check_status;
+
 /** \name Macro Defined Functions *********************************************/
 ///@{
 
@@ -146,8 +153,8 @@ void PS_calibrate(PS_t *pressure_sensor);
 void PS_scan_all(PS_t *pressure_sensor);
 void PS_print_scan_buffer(PS_t *pressure_sensor);
 void PS_print_compensation_buffer(PS_t *pressure_sensor);
-bool PS_check(PS_t *pressure_sensor, uint16_t abs_threshold,
-              uint16_t delta_threshold);
+PS_check_status PS_check(PS_t *pressure_sensor, uint16_t abs_threshold,
+                         uint16_t delta_threshold);
 
 #endif /* end of include guard: _PRESSURE_SENSOR_H_ */
 /** @} */ /* end of \defgoup pressure_sensor */
